@@ -1,0 +1,1843 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OperaIQ — Operations Intelligence Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --blue: #1d6ff2;
+    --blue-light: #dbeafe;
+    --teal: #0d9488;
+    --teal-light: #ccfbf1;
+    --red: #dc2626;
+    --red-light: #fee2e2;
+    --amber: #d97706;
+    --amber-light: #fef3c7;
+    --gray: #6b7280;
+    --gray-light: #f3f4f6;
+    --gray-border: #e5e7eb;
+    --text: #111827;
+    --text-muted: #6b7280;
+    --white: #ffffff;
+    --surface: #f9fafb;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'DM Sans', system-ui, sans-serif;
+    background: var(--surface);
+    color: var(--text);
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  /* ── TOP HEADER ── */
+  .top-header {
+    background: var(--white);
+    border-bottom: 1px solid var(--gray-border);
+    padding: 0 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 60px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .brand { display: flex; align-items: center; gap: 12px; }
+  .brand-icon {
+    width: 34px; height: 34px;
+    background: var(--blue);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .brand-icon svg { width: 18px; height: 18px; fill: white; }
+  .brand-title { font-size: 15px; font-weight: 600; letter-spacing: -0.3px; }
+  .brand-sub { font-size: 11px; color: var(--text-muted); font-weight: 400; }
+  .header-right { display: flex; align-items: center; gap: 12px; }
+  .file-info { font-size: 12px; color: var(--text-muted); text-align: right; }
+  .file-info strong { display: block; color: var(--text); font-weight: 500; }
+  .upload-btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: var(--blue); color: white;
+    border: none; border-radius: 6px;
+    padding: 8px 14px; font-size: 13px; font-weight: 500;
+    cursor: pointer; font-family: inherit;
+    transition: background 0.15s;
+  }
+  .upload-btn:hover { background: #1558cc; }
+  .upload-btn svg { width: 15px; height: 15px; }
+
+  /* ── FILTER BAR ── */
+  .filter-bar {
+    background: var(--white);
+    border-bottom: 1px solid var(--gray-border);
+    padding: 10px 24px;
+    display: flex; align-items: center; gap: 20px;
+    flex-wrap: wrap;
+    position: sticky; top: 60px; z-index: 99;
+  }
+  .filter-group { display: flex; align-items: center; gap: 8px; }
+  .filter-label { font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; }
+
+  .filter-select {
+    padding: 4px 8px; border: 1px solid var(--gray-border); border-radius: 4px;
+    font-size: 12px; font-family: inherit; color: var(--text);
+    background: white; cursor: pointer;
+  }
+  .toggle-group { display: flex; background: var(--gray-light); border-radius: 5px; padding: 2px; }
+  .toggle-btn {
+    padding: 3px 10px; border-radius: 4px; border: none; background: none;
+    font-size: 12px; font-weight: 500; cursor: pointer; font-family: inherit;
+    color: var(--text-muted); transition: all 0.1s;
+  }
+  .toggle-btn.active { background: white; color: var(--blue); box-shadow: 0 1px 2px rgba(0,0,0,.1); }
+  .reset-btn {
+    padding: 4px 10px; border-radius: 4px; border: 1px solid var(--gray-border);
+    background: white; font-size: 12px; cursor: pointer; font-family: inherit;
+    color: var(--text-muted); transition: all 0.1s; margin-left: auto;
+  }
+  .reset-btn:hover { border-color: var(--red); color: var(--red); }
+
+  /* ── MAIN LAYOUT ── */
+  .main { padding: 20px 24px; max-width: 1600px; margin: 0 auto; }
+  .error-banner {
+    background: var(--red-light); border: 1px solid #fca5a5; border-radius: 8px;
+    padding: 10px 16px; margin-bottom: 16px; font-size: 13px; color: var(--red);
+    display: none;
+  }
+
+  /* ── KPI CARDS ── */
+  .kpi-row { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; margin-bottom: 20px; }
+  .kpi-card {
+    background: var(--white); border: 1px solid var(--gray-border);
+    border-radius: 10px; padding: 16px;
+    display: flex; flex-direction: column; gap: 6px;
+  }
+  .kpi-card.alert { border-color: #fca5a5; background: var(--red-light); }
+  .kpi-label { font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+  .kpi-value { font-size: 26px; font-weight: 700; letter-spacing: -1px; line-height: 1; font-family: 'DM Mono', monospace; }
+  .kpi-sub { font-size: 11px; color: var(--text-muted); display: flex; align-items: center; gap: 4px; }
+  .kpi-trend { font-weight: 600; }
+  .kpi-trend.up { color: var(--teal); }
+  .kpi-trend.down { color: var(--red); }
+  .kpi-trend.neutral { color: var(--gray); }
+
+  /* ── CHART GRID ── */
+  .chart-grid { display: grid; gap: 16px; margin-bottom: 16px; }
+  .chart-grid-2 { grid-template-columns: 1fr 1fr; }
+  .chart-grid-3 { grid-template-columns: 1fr 1fr 1fr; }
+  .chart-grid-full { grid-template-columns: 1fr; }
+  .chart-card {
+    background: var(--white); border: 1px solid var(--gray-border);
+    border-radius: 10px; padding: 18px;
+  }
+  .chart-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 14px; }
+  .chart-title { font-size: 13px; font-weight: 600; color: var(--text); }
+  .chart-subtitle { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+  .chart-badge {
+    font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 20px;
+  }
+  .badge-green { background: var(--teal-light); color: var(--teal); }
+  .badge-red { background: var(--red-light); color: var(--red); }
+  .badge-amber { background: var(--amber-light); color: var(--amber); }
+  .chart-canvas-wrap { position: relative; }
+
+
+  /* ── HEATMAP ── */
+  .heatmap-wrap { overflow-x: auto; }
+  /* Legacy heatmap kept for fallback, new summary table styles below */
+  .abs-table { border-collapse: collapse; width: 100%; min-width: 500px; font-size: 11px; }
+  .abs-table th {
+    background: var(--surface); font-size: 10px; font-weight: 600;
+    color: var(--text-muted); text-align: center; padding: 5px 6px;
+    white-space: nowrap; border-bottom: 2px solid var(--gray-border);
+    position: sticky; top: 0; z-index: 2;
+  }
+  .abs-table th.row-hdr { text-align: left; min-width: 130px; }
+  .abs-table td {
+    text-align: center; padding: 5px 6px; border-bottom: 1px solid #f0f0f0;
+    font-family: 'DM Mono', monospace; white-space: nowrap; min-width: 52px;
+  }
+  .abs-table td.row-label {
+    text-align: left; font-family: 'DM Sans', system-ui, sans-serif;
+    font-weight: 600; color: var(--text); background: var(--surface);
+    position: sticky; left: 0; z-index: 1; border-right: 2px solid var(--gray-border);
+    padding-left: 8px;
+  }
+  .abs-table tr:last-child td { border-bottom: none; }
+  .abs-table tr.row-pct td { font-weight: 700; }
+  .abs-cell-0   { color: #c9d0da; }
+  .abs-cell-low { color: #111827; background: rgba(217,119,6,0.12); }
+  .abs-cell-mid { color: #111827; background: rgba(220,38,38,0.18); }
+  .abs-cell-hi  { color: #fff;    background: rgba(220,38,38,0.72); font-weight:700; }
+  .abs-pct-ok   { color: #0d9488; }
+  .abs-pct-warn { color: #d97706; font-weight: 700; }
+  .abs-pct-bad  { color: #dc2626; font-weight: 700; }
+  .heatmap-table { border-collapse: collapse; width: 100%; min-width: 600px; }
+  .heatmap-table th { font-size: 10px; font-weight: 600; color: var(--text-muted); text-align: center; padding: 3px 4px; white-space: nowrap; }
+  .heatmap-table td {
+    width: 20px; height: 22px; text-align: center; font-size: 10px;
+    font-family: 'DM Mono', monospace; cursor: default; border-radius: 2px;
+    position: relative;
+  }
+  .heatmap-table td.team-label {
+    font-size: 11px; font-weight: 600; color: var(--text); text-align: right;
+    padding-right: 8px; width: 80px; white-space: nowrap;
+  }
+  .heatmap-cell { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; border-radius: 2px; font-size: 9px; }
+
+  /* ── DONUT ── */
+  .donut-wrap { display: flex; align-items: center; gap: 24px; }
+  .donut-legend { display: flex; flex-direction: column; gap: 8px; flex: 1; }
+  .legend-item { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+  .legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .legend-label { flex: 1; color: var(--text-muted); }
+  .legend-val { font-weight: 600; font-family: 'DM Mono', monospace; }
+
+  /* ── INSIGHTS PANEL ── */
+
+  /* ── ERROR TREND TOGGLE BUTTONS ── */
+  .err-toggle-btn {
+    padding: 3px 10px; border-radius: 4px; border: 1px solid var(--gray-border);
+    background: white; font-size: 11px; font-weight: 500; cursor: pointer;
+    font-family: inherit; color: var(--text-muted); transition: all 0.12s;
+  }
+  .err-toggle-btn:hover:not(.active) { border-color: var(--blue); color: var(--blue); }
+  .err-toggle-btn.active { background: var(--blue); border-color: var(--blue); color: white; font-weight: 600; }
+
+  /* ── FOOTER ── */
+  .footer { text-align: center; color: var(--text-muted); font-size: 11px; padding: 24px; }
+
+  @media (max-width: 1200px) {
+    .kpi-row { grid-template-columns: repeat(3, 1fr); }
+    .chart-grid-2 { grid-template-columns: 1fr; }
+    .chart-grid-3 { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<!-- TOP HEADER -->
+<header class="top-header">
+  <div class="brand">
+    <div class="brand-icon" style="background: linear-gradient(135deg, #1d6ff2 0%, #0d9488 100%); border-radius: 10px;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+      </svg>
+    </div>
+    <div>
+      <div class="brand-title" style="font-size:17px; letter-spacing:-0.5px; background: linear-gradient(135deg, #1d6ff2, #0d9488); -webkit-background-clip:text; -webkit-text-fill-color:transparent; font-weight:700;">OperaIQ</div>
+      <div class="brand-sub">Operations Intelligence · Q1 2026</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="file-info" id="file-info">
+      <strong>OperaIQ</strong>
+      <span id="file-status">Data loaded · Auto-updated via Power Automate</span>
+    </div>
+  </div>
+</header>
+
+<!-- URL SETUP MODAL removed — no longer needed -->
+
+<!-- FILTER BAR -->
+<div class="filter-bar">
+
+  <!-- Hierarchy filters -->
+  <div class="filter-group">
+    <span class="filter-label">Year</span>
+    <select class="filter-select" id="f-year" onchange="onYearChange()">
+      <option value="">All</option>
+    </select>
+  </div>
+  <div class="filter-group">
+    <span class="filter-label">Quarter</span>
+    <select class="filter-select" id="f-quarter" onchange="onQuarterChange()">
+      <option value="">All</option>
+    </select>
+  </div>
+  <div class="filter-group">
+    <span class="filter-label">Month</span>
+    <select class="filter-select" id="f-month" onchange="onMonthChange()">
+      <option value="">All</option>
+    </select>
+  </div>
+  <div class="filter-group">
+    <span class="filter-label">Week</span>
+    <select class="filter-select" id="f-week" onchange="onWeekChange()">
+      <option value="">All</option>
+    </select>
+  </div>
+  <div class="filter-group">
+    <span class="filter-label">Date</span>
+    <select class="filter-select" id="f-date" onchange="onDateChange()">
+      <option value="">All</option>
+    </select>
+  </div>
+  <div class="filter-group">
+    <span class="filter-label">Day</span>
+    <select class="filter-select" id="f-day" onchange="onDayChange()">
+      <option value="">All</option>
+      <option value="1">Monday</option>
+      <option value="2">Tuesday</option>
+      <option value="3">Wednesday</option>
+      <option value="4">Thursday</option>
+      <option value="5">Friday</option>
+    </select>
+  </div>
+
+  <!-- View toggle -->
+  <div class="filter-group">
+    <span class="filter-label">View</span>
+    <div class="toggle-group">
+      <button class="toggle-btn active"  id="view-monthly" onclick="setView('monthly')">Monthly</button>
+      <button class="toggle-btn"        id="view-daily"   onclick="setView('daily')">Daily</button>
+    </div>
+  </div>
+
+  <button class="reset-btn" onclick="resetFilters()">↺ Reset</button>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+  <div class="error-banner" id="error-banner"></div>
+
+  <!-- KPI CARDS -->
+  <div class="kpi-row" id="kpi-row">
+    <div class="kpi-card"><div class="kpi-label">Avg Daily Incoming</div><div class="kpi-value" id="kpi-incoming">—</div><div class="kpi-sub"><span class="kpi-trend neutral" id="kpi-incoming-trend">Loading…</span></div></div>
+    <div class="kpi-card"><div class="kpi-label">Avg Daily Processed Volume</div><div class="kpi-value" id="kpi-outgoing">—</div><div class="kpi-sub"><span class="kpi-trend neutral" id="kpi-outgoing-trend">vs target 110/day</span></div></div>
+    <div class="kpi-card"><div class="kpi-label">Avg Daily Inventory</div><div class="kpi-value" id="kpi-backlog">—</div><div class="kpi-sub" id="kpi-backlog-trend">Period average</div></div>
+    <div class="kpi-card"><div class="kpi-label">Attendance Rate</div><div class="kpi-value" id="kpi-attendance">—</div><div class="kpi-sub" id="kpi-attendance-sub">Present HC / Total HC</div></div>
+    <div class="kpi-card" id="kpi-absent-card"><div class="kpi-label">Inline Error Rate %</div><div class="kpi-value" id="kpi-absent">—</div><div class="kpi-sub" id="kpi-absent-sub">Overall Errors / Samples</div></div>
+    <div class="kpi-card"><div class="kpi-label">External Error Rate %</div><div class="kpi-value" id="kpi-quality">—</div><div class="kpi-sub" id="kpi-quality-sub">Total Errors / Samples</div></div>
+  </div>
+
+  <!-- ROW 1: Inflow | Processed Volume | Inventory -->
+  <div class="chart-grid" style="grid-template-columns: 1fr 1fr 1fr; gap:16px; margin-bottom:16px;">
+    <div class="chart-card">
+      <div class="chart-header">
+        <div>
+          <div class="chart-title">Inflow Volume</div>
+          <div class="chart-subtitle" id="inflow-subtitle">Daily incoming cases</div>
+        </div>
+        <span class="chart-badge badge-green" id="badge-inflow">—</span>
+      </div>
+      <div class="chart-canvas-wrap" style="height:240px"><canvas id="chart-inflow"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-header">
+        <div>
+          <div class="chart-title">Processed Volume vs Target</div>
+          <div class="chart-subtitle" id="outflow-subtitle">Daily processed cases · target 110</div>
+        </div>
+        <span class="chart-badge" id="badge-target">—</span>
+      </div>
+      <div class="chart-canvas-wrap" style="height:240px"><canvas id="chart-outflow"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-header">
+        <div>
+          <div class="chart-title">Inventory Trend</div>
+          <div class="chart-subtitle">Cumulative inventory by day</div>
+        </div>
+        <span class="chart-badge badge-red" id="badge-backlog">—</span>
+      </div>
+      <div class="chart-canvas-wrap" style="height:240px"><canvas id="chart-backlog"></canvas></div>
+    </div>
+  </div>
+
+  <!-- ROW 2: Overall Absenteeism % -->
+  <div class="chart-grid chart-grid-full">
+    <div class="chart-card">
+      <div class="chart-header">
+        <div>
+          <div class="chart-title">Overall Absenteeism %</div>
+          <div class="chart-subtitle" id="absent-trend-subtitle">Avg absenteeism % by day of week · switch to Monthly for monthly view</div>
+        </div>
+        <span class="chart-badge" id="badge-absent-trend">—</span>
+      </div>
+      <div class="chart-canvas-wrap" style="height:220px"><canvas id="chart-absent-trend"></canvas></div>
+    </div>
+  </div>
+
+  <!-- ROW 3: Absenteeism Summary Table -->
+  <div class="chart-grid chart-grid-full">
+    <div class="chart-card">
+      <div class="chart-header">
+        <div>
+          <div class="chart-title" id="heatmap-title">Absenteeism Summary by Date</div>
+          <div class="chart-subtitle">CP = DE + DE/QC + Intake + QC &nbsp;·&nbsp; Absenteeism % = Total Absent ÷ Total HC × 100 &nbsp;·&nbsp; Switch to Monthly for monthly view</div>
+        </div>
+      </div>
+      <div class="heatmap-wrap" id="heatmap-wrap">Loading…</div>
+    </div>
+  </div>
+
+  <!-- ROW 4: Quality % — 5 individual metric charts -->
+  <div style="margin-bottom:8px; display:flex; align-items:center; gap:10px;">
+    <div style="font-size:13px;font-weight:700;color:var(--text)">Quality Metrics</div>
+    <span style="font-size:11px;color:var(--text-muted)">Formula: 1 − (DPU ÷ Samples) &nbsp;|&nbsp; Green = meets target · Red = below target</span>
+  </div>
+  <div style="font-size:12px;font-weight:600;color:var(--blue);margin-bottom:6px;letter-spacing:0.2px;">INLINE QUALITY &nbsp;<span id="quality-sample-label" style="font-weight:400;color:var(--text-muted)"></span></div>
+  <div class="chart-grid" style="grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:14px;">
+    <div class="chart-card" style="padding:14px;">
+      <div class="chart-header" style="margin-bottom:10px;">
+        <div><div class="chart-title">Critical Quality %</div><div class="chart-subtitle">Target ≥ 96%</div></div>
+        <span class="chart-badge" id="badge-iq-crit">—</span>
+      </div>
+      <div class="chart-canvas-wrap" style="height:200px"><canvas id="chart-iq-crit"></canvas></div>
+    </div>
+    <div class="chart-card" style="padding:14px;">
+      <div class="chart-header" style="margin-bottom:10px;">
+        <div><div class="chart-title">Major Quality %</div><div class="chart-subtitle">Target ≥ 92%</div></div>
+        <span class="chart-badge" id="badge-iq-maj">—</span>
+      </div>
+      <div class="chart-canvas-wrap" style="height:200px"><canvas id="chart-iq-maj"></canvas></div>
+    </div>
+    <div class="chart-card" style="padding:14px;">
+      <div class="chart-header" style="margin-bottom:10px;">
+        <div><div class="chart-title">Minor Quality %</div><div class="chart-subtitle">Target ≥ 90%</div></div>
+        <span class="chart-badge" id="badge-iq-min">—</span>
+      </div>
+      <div class="chart-canvas-wrap" style="height:200px"><canvas id="chart-iq-min"></canvas></div>
+    </div>
+  </div>
+  <div style="font-size:12px;font-weight:600;color:var(--teal);margin-bottom:6px;letter-spacing:0.2px;">EXTERNAL QUALITY &nbsp;<span id="ext-quality-sample-label" style="font-weight:400;color:var(--text-muted)"></span></div>
+  <div class="chart-grid" style="grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:14px;">
+    <div class="chart-card" style="padding:14px;">
+      <div class="chart-header" style="margin-bottom:10px;">
+        <div><div class="chart-title">Critical Quality %</div><div class="chart-subtitle">Target ≥ 99%</div></div>
+        <span class="chart-badge" id="badge-eq-crit">—</span>
+      </div>
+      <div class="chart-canvas-wrap" style="height:200px"><canvas id="chart-eq-crit"></canvas></div>
+    </div>
+    <div class="chart-card" style="padding:14px;">
+      <div class="chart-header" style="margin-bottom:10px;">
+        <div><div class="chart-title">Major Quality %</div><div class="chart-subtitle">Target ≥ 97%</div></div>
+        <span class="chart-badge" id="badge-eq-maj">—</span>
+      </div>
+      <div class="chart-canvas-wrap" style="height:200px"><canvas id="chart-eq-maj"></canvas></div>
+    </div>
+  </div>
+
+  <!-- ROW 5: Error trend — Inline + External -->
+  <div class="chart-grid chart-grid-2" style="gap:16px; margin-bottom:16px;">
+
+    <!-- Inline Quality Error Trend -->
+    <div class="chart-card">
+      <div class="chart-header" style="flex-wrap:wrap; gap:8px;">
+        <div>
+          <div class="chart-title">Inline Quality — Error Count Trend</div>
+          <div class="chart-subtitle" id="iq-trend-subtitle">Daily errors · toggle by type</div>
+        </div>
+        <div style="display:flex; gap:6px; flex-wrap:wrap;">
+          <button class="err-toggle-btn active" id="iq-btn-overall"  onclick="setIQFilter('Overall')" >Overall</button>
+          <button class="err-toggle-btn"        id="iq-btn-critical" onclick="setIQFilter('Critical')">Critical</button>
+          <button class="err-toggle-btn"        id="iq-btn-major"    onclick="setIQFilter('Major')"   >Major</button>
+          <button class="err-toggle-btn"        id="iq-btn-minor"    onclick="setIQFilter('Minor')"   >Minor</button>
+        </div>
+      </div>
+      <div class="chart-canvas-wrap" style="height:200px"><canvas id="chart-quality-trend"></canvas></div>
+    </div>
+
+    <!-- External Quality Error Trend -->
+    <div class="chart-card">
+      <div class="chart-header" style="flex-wrap:wrap; gap:8px;">
+        <div>
+          <div class="chart-title">External Quality — Error Count Trend</div>
+          <div class="chart-subtitle" id="eq-trend-subtitle">Daily errors · toggle by type</div>
+        </div>
+        <div style="display:flex; gap:6px; flex-wrap:wrap;">
+          <button class="err-toggle-btn active" id="eq-btn-overall"  onclick="setEQFilter('Overall')" >Overall</button>
+          <button class="err-toggle-btn"        id="eq-btn-critical" onclick="setEQFilter('Critical')">Critical</button>
+          <button class="err-toggle-btn"        id="eq-btn-major"    onclick="setEQFilter('Major')"   >Major</button>
+        </div>
+      </div>
+      <div class="chart-canvas-wrap" style="height:200px"><canvas id="chart-ext-quality-trend"></canvas></div>
+    </div>
+
+  </div>
+
+
+</div>
+
+<div class="footer">OperaIQ · Operations Intelligence Dashboard · Powered by Chart.js + SheetJS</div>
+
+<script>
+// ═══════════════════════════════
+// EMBEDDED SAMPLE DATA
+// ═══════════════════════════════
+const SAMPLE_DATA = {"Incoming-Outgoing":[{"Month":"Jan 26","Date":"2026-01-01","Incoming Cases(Actuals)":81.0,"Backlog(Actuals)":389.0,"Outgoing(Actuals)- Target 110":66.0,"Insights":null},{"Month":"Jan 26","Date":"2026-01-02","Incoming Cases(Actuals)":36.0,"Backlog(Actuals)":444.0,"Outgoing(Actuals)- Target 110":92.0,"Insights":null},{"Month":"Jan 26","Date":"2026-01-03","Incoming Cases(Actuals)":0.0,"Backlog(Actuals)":0.0,"Outgoing(Actuals)- Target 110":0.0,"Insights":null},{"Month":"Jan 26","Date":"2026-01-04","Incoming Cases(Actuals)":null,"Backlog(Actuals)":null,"Outgoing(Actuals)- Target 110":null,"Insights":null},{"Month":"Jan 26","Date":"2026-01-05","Incoming Cases(Actuals)":108.0,"Backlog(Actuals)":408.0,"Outgoing(Actuals)- Target 110":92.0,"Insights":null},{"Month":"Jan 26","Date":"2026-01-06","Incoming Cases(Actuals)":120.0,"Backlog(Actuals)":408.0,"Outgoing(Actuals)- Target 110":124.0,"Insights":null},{"Month":"Jan 26","Date":"2026-01-07","Incoming Cases(Actuals)":73.0,"Backlog(Actuals)":427.0,"Outgoing(Actuals)- Target 110":134.0,"Insights":null},{"Month":"Jan 26","Date":"2026-01-08","Incoming Cases(Actuals)":85.0,"Backlog(Actuals)":381.0,"Outgoing(Actuals)- Target 110":114.0,"Insights":null},{"Month":"Jan 26","Date":"2026-01-09","Incoming Cases(Actuals)":83.0,"Backlog(Actuals)":392.0,"Outgoing(Actuals)- Target 110":95.0,"Insights":null},{"Month":"Jan 26","Date":"2026-01-10","Incoming Cases(Actuals)":0.0,"Backlog(Actuals)":0.0,"Outgoing(Actuals)- Target 110":0.0,"Insights":null},{"Month":"Jan 26","Date":"2026-01-11","Incoming Cases(Actuals)":null,"Backlog(Actuals)":null,"Outgoing(Actuals)- Target 110":null,"Insights":null},{"Month":"Jan 26","Date":"2026-01-12","Incoming Cases(Actuals)":131.0,"Backlog(Actuals)":383.0,"Outgoing(Actuals)- Target 110":137.0,"Insights":null},{"Month":"Jan 26","Date":"2026-01-13","Incoming Cases(Actuals)":89.0,"Backlog(Actuals)":384.0,"Outgoing(Actuals)- Target 110":122.0,"Insights":null},{"Month":"Jan 26","Date":"2026-01-14","Incoming Cases(Actuals)":82.0,"Backlog(Actuals)":355.0,"Outgoing(Actuals)- Target 110":141.0,"Insights":null},{"Month":"Jan 26","Date":"2026-01-15","Incoming Cases(Actuals)":99.0,"Backlog(Actuals)":294.0,"Outgoing(Actuals)- Target 110":108.0,"Insights":null},{"Month":"Jan 26","Date":"2026-01-16","Incoming Cases(Actuals)":106.0,"Backlog(Actuals)":290.0,"Outgoing(Actuals)- Target 110":110.0,"Insights":null},{"Month":"Jan 26","Date":"2026-01-17","Incoming Cases(Actuals)":0.0,"Backlog(Actuals)":0.0,"Outgoing(Actuals)- Target 110":0.0,"Insights":null},{"Month":"Jan 26","Date":"2026-01-18","Incoming Cases(Actuals)":null,"Backlog(Actuals)":null,"Outgoing(Actuals)- Target 110":null,"Insights":null},{"Month":"Jan 26","Date":"2026-01-19","Incoming Cases(Actuals)":106.0,"Backlog(Actuals)":316.0,"Outgoing(Actuals)- Target 110":107.0,"Insights":null},{"Month":"Jan 26","Date":"2026-01-20","Incoming Cases(Actuals)":77.0,"Backlog(Actuals)":321.0,"Outgoing(Actuals)- Target 110":109.0,"Insights":null},{"Month":"Jan 26","Date":"2026-01-21","Incoming Cases(Actuals)":68.0,"Backlog(Actuals)":318.0,"Outgoing(Actuals)- Target 110":83.0,"Insights":null},{"Month":"Jan 26","Date":"2026-01-22","Incoming Cases(Actuals)":81.0,"Backlog(Actuals)":308.0,"Outgoing(Actuals)- Target 110":94.0,"Insights":null},{"Month":"Jan 26","Date":"2026-01-23","Incoming Cases(Actuals)":86.0,"Backlog(Actuals)":312.0,"Outgoing(Actuals)- Target 110":107.0,"Insights":null},{"Month":"Jan 26","Date":"2026-01-24","Incoming Cases(Actuals)":0.0,"Backlog(Actuals)":0.0,"Outgoing(Actuals)- Target 110":0.0,"Insights":null},{"Month":"Jan 26","Date":"2026-01-25","Incoming Cases(Actuals)":null,"Backlog(Actuals)":null,"Outgoing(Actuals)- Target 110":null,"Insights":null},{"Month":"Jan 26","Date":"2026-01-26","Incoming Cases(Actuals)":131.0,"Backlog(Actuals)":257.0,"Outgoing(Actuals)- Target 110":69.0,"Insights":null},{"Month":"Jan 26","Date":"2026-01-27","Incoming Cases(Actuals)":138.0,"Backlog(Actuals)":346.0,"Outgoing(Actuals)- Target 110":99.0,"Insights":null},{"Month":"Jan 26","Date":"2026-01-28","Incoming Cases(Actuals)":82.0,"Backlog(Actuals)":411.0,"Outgoing(Actuals)- Target 110":132.0,"Insights":null},{"Month":"Jan 26","Date":"2026-01-29","Incoming Cases(Actuals)":70.0,"Backlog(Actuals)":362.0,"Outgoing(Actuals)- Target 110":110.0,"Insights":null},{"Month":"Jan 26","Date":"2026-01-30","Incoming Cases(Actuals)":95.0,"Backlog(Actuals)":346.0,"Outgoing(Actuals)- Target 110":145.0,"Insights":null},{"Month":"Jan 26","Date":"2026-01-31","Incoming Cases(Actuals)":0.0,"Backlog(Actuals)":0.0,"Outgoing(Actuals)- Target 110":0.0,"Insights":null},{"Month":"Feb 26","Date":"2026-02-01","Incoming Cases(Actuals)":null,"Backlog(Actuals)":null,"Outgoing(Actuals)- Target 110":null,"Insights":null},{"Month":"Feb 26","Date":"2026-02-02","Incoming Cases(Actuals)":112.0,"Backlog(Actuals)":319.0,"Outgoing(Actuals)- Target 110":94.0,"Insights":null},{"Month":"Feb 26","Date":"2026-02-03","Incoming Cases(Actuals)":89.0,"Backlog(Actuals)":361.0,"Outgoing(Actuals)- Target 110":138.0,"Insights":null},{"Month":"Feb 26","Date":"2026-02-04","Incoming Cases(Actuals)":85.0,"Backlog(Actuals)":327.0,"Outgoing(Actuals)- Target 110":92.0,"Insights":null},{"Month":"Feb 26","Date":"2026-02-05","Incoming Cases(Actuals)":94.0,"Backlog(Actuals)":313.0,"Outgoing(Actuals)- Target 110":130.0,"Insights":null},{"Month":"Feb 26","Date":"2026-02-06","Incoming Cases(Actuals)":119.0,"Backlog(Actuals)":292.0,"Outgoing(Actuals)- Target 110":132.0,"Insights":null},{"Month":"Feb 26","Date":"2026-02-07","Incoming Cases(Actuals)":0.0,"Backlog(Actuals)":0.0,"Outgoing(Actuals)- Target 110":0.0,"Insights":null},{"Month":"Feb 26","Date":"2026-02-08","Incoming Cases(Actuals)":null,"Backlog(Actuals)":null,"Outgoing(Actuals)- Target 110":null,"Insights":null},{"Month":"Feb 26","Date":"2026-02-09","Incoming Cases(Actuals)":142.0,"Backlog(Actuals)":300.0,"Outgoing(Actuals)- Target 110":101.0,"Insights":null},{"Month":"Feb 26","Date":"2026-02-10","Incoming Cases(Actuals)":101.0,"Backlog(Actuals)":351.0,"Outgoing(Actuals)- Target 110":116.0,"Insights":null},{"Month":"Feb 26","Date":"2026-02-11","Incoming Cases(Actuals)":107.0,"Backlog(Actuals)":345.0,"Outgoing(Actuals)- Target 110":104.0,"Insights":null},{"Month":"Feb 26","Date":"2026-02-12","Incoming Cases(Actuals)":121.0,"Backlog(Actuals)":389.0,"Outgoing(Actuals)- Target 110":88.0,"Insights":null},{"Month":"Feb 26","Date":"2026-02-13","Incoming Cases(Actuals)":119.0,"Backlog(Actuals)":388.0,"Outgoing(Actuals)- Target 110":129.0,"Insights":null},{"Month":"Feb 26","Date":"2026-02-14","Incoming Cases(Actuals)":0.0,"Backlog(Actuals)":0.0,"Outgoing(Actuals)- Target 110":0.0,"Insights":null},{"Month":"Feb 26","Date":"2026-02-15","Incoming Cases(Actuals)":null,"Backlog(Actuals)":null,"Outgoing(Actuals)- Target 110":null,"Insights":null},{"Month":"Feb 26","Date":"2026-02-16","Incoming Cases(Actuals)":159.0,"Backlog(Actuals)":383.0,"Outgoing(Actuals)- Target 110":96.0,"Insights":null},{"Month":"Feb 26","Date":"2026-02-17","Incoming Cases(Actuals)":129.0,"Backlog(Actuals)":496.0,"Outgoing(Actuals)- Target 110":173.0,"Insights":null},{"Month":"Feb 26","Date":"2026-02-18","Incoming Cases(Actuals)":118.0,"Backlog(Actuals)":434.0,"Outgoing(Actuals)- Target 110":133.0,"Insights":null},{"Month":"Feb 26","Date":"2026-02-19","Incoming Cases(Actuals)":100.0,"Backlog(Actuals)":499.0,"Outgoing(Actuals)- Target 110":107.0,"Insights":null},{"Month":"Feb 26","Date":"2026-02-20","Incoming Cases(Actuals)":95.0,"Backlog(Actuals)":756.0,"Outgoing(Actuals)- Target 110":102.0,"Insights":null},{"Month":"Feb 26","Date":"2026-02-21","Incoming Cases(Actuals)":0.0,"Backlog(Actuals)":0.0,"Outgoing(Actuals)- Target 110":0.0,"Insights":null},{"Month":"Feb 26","Date":"2026-02-22","Incoming Cases(Actuals)":null,"Backlog(Actuals)":null,"Outgoing(Actuals)- Target 110":null,"Insights":null},{"Month":"Feb 26","Date":"2026-02-23","Incoming Cases(Actuals)":82.0,"Backlog(Actuals)":760.0,"Outgoing(Actuals)- Target 110":136.0,"Insights":null},{"Month":"Feb 26","Date":"2026-02-24","Incoming Cases(Actuals)":132.0,"Backlog(Actuals)":803.0,"Outgoing(Actuals)- Target 110":149.0,"Insights":null},{"Month":"Feb 26","Date":"2026-02-25","Incoming Cases(Actuals)":93.0,"Backlog(Actuals)":864.0,"Outgoing(Actuals)- Target 110":126.0,"Insights":null},{"Month":"Feb 26","Date":"2026-02-26","Incoming Cases(Actuals)":149.0,"Backlog(Actuals)":853.0,"Outgoing(Actuals)- Target 110":152.0,"Insights":null},{"Month":"Feb 26","Date":"2026-02-27","Incoming Cases(Actuals)":120.0,"Backlog(Actuals)":862.0,"Outgoing(Actuals)- Target 110":100.0,"Insights":null},{"Month":"Feb 26","Date":"2026-02-28","Incoming Cases(Actuals)":0.0,"Backlog(Actuals)":0.0,"Outgoing(Actuals)- Target 110":0.0,"Insights":null},{"Month":"Mar 26","Date":"2026-03-01","Incoming Cases(Actuals)":null,"Backlog(Actuals)":null,"Outgoing(Actuals)- Target 110":null,"Insights":null},{"Month":"Mar 26","Date":"2026-03-02","Incoming Cases(Actuals)":121.0,"Backlog(Actuals)":950.0,"Outgoing(Actuals)- Target 110":158.0,"Insights":null},{"Month":"Mar 26","Date":"2026-03-03","Incoming Cases(Actuals)":118.0,"Backlog(Actuals)":1105.0,"Outgoing(Actuals)- Target 110":167.0,"Insights":null},{"Month":"Mar 26","Date":"2026-03-04","Incoming Cases(Actuals)":344.0,"Backlog(Actuals)":829.0,"Outgoing(Actuals)- Target 110":138.0,"Insights":null},{"Month":"Mar 26","Date":"2026-03-05","Incoming Cases(Actuals)":96.0,"Backlog(Actuals)":1013.0,"Outgoing(Actuals)- Target 110":234.0,"Insights":null},{"Month":"Mar 26","Date":"2026-03-06","Incoming Cases(Actuals)":128.0,"Backlog(Actuals)":937.0,"Outgoing(Actuals)- Target 110":190.0,"Insights":null},{"Month":"Mar 26","Date":"2026-03-07","Incoming Cases(Actuals)":0.0,"Backlog(Actuals)":0.0,"Outgoing(Actuals)- Target 110":0.0,"Insights":null},{"Month":"Mar 26","Date":"2026-03-08","Incoming Cases(Actuals)":null,"Backlog(Actuals)":null,"Outgoing(Actuals)- Target 110":null,"Insights":null},{"Month":"Mar 26","Date":"2026-03-09","Incoming Cases(Actuals)":110.0,"Backlog(Actuals)":850.0,"Outgoing(Actuals)- Target 110":186.0,"Insights":null},{"Month":"Mar 26","Date":"2026-03-10","Incoming Cases(Actuals)":113.0,"Backlog(Actuals)":784.0,"Outgoing(Actuals)- Target 110":178.0,"Insights":null},{"Month":"Mar 26","Date":"2026-03-11","Incoming Cases(Actuals)":75.0,"Backlog(Actuals)":972.0,"Outgoing(Actuals)- Target 110":112.0,"Insights":null},{"Month":"Mar 26","Date":"2026-03-12","Incoming Cases(Actuals)":86.0,"Backlog(Actuals)":1019.0,"Outgoing(Actuals)- Target 110":135.0,"Insights":null},{"Month":"Mar 26","Date":"2026-03-13","Incoming Cases(Actuals)":89.0,"Backlog(Actuals)":962.0,"Outgoing(Actuals)- Target 110":117.0,"Insights":null},{"Month":"Mar 26","Date":"2026-03-14","Incoming Cases(Actuals)":0.0,"Backlog(Actuals)":0.0,"Outgoing(Actuals)- Target 110":0.0,"Insights":null},{"Month":"Mar 26","Date":"2026-03-15","Incoming Cases(Actuals)":null,"Backlog(Actuals)":null,"Outgoing(Actuals)- Target 110":null,"Insights":null},{"Month":"Mar 26","Date":"2026-03-16","Incoming Cases(Actuals)":116.0,"Backlog(Actuals)":955.0,"Outgoing(Actuals)- Target 110":262.0,"Insights":null},{"Month":"Mar 26","Date":"2026-03-17","Incoming Cases(Actuals)":102.0,"Backlog(Actuals)":837.0,"Outgoing(Actuals)- Target 110":110.0,"Insights":null},{"Month":"Mar 26","Date":"2026-03-18","Incoming Cases(Actuals)":108.0,"Backlog(Actuals)":916.0,"Outgoing(Actuals)- Target 110":109.0,"Insights":null},{"Month":"Mar 26","Date":"2026-03-19","Incoming Cases(Actuals)":155.0,"Backlog(Actuals)":916.0,"Outgoing(Actuals)- Target 110":94.0,"Insights":null},{"Month":"Mar 26","Date":"2026-03-20","Incoming Cases(Actuals)":149.0,"Backlog(Actuals)":905.0,"Outgoing(Actuals)- Target 110":82.0,"Insights":null},{"Month":"Mar 26","Date":"2026-03-21","Incoming Cases(Actuals)":0.0,"Backlog(Actuals)":0.0,"Outgoing(Actuals)- Target 110":0.0,"Insights":null},{"Month":"Mar 26","Date":"2026-03-22","Incoming Cases(Actuals)":null,"Backlog(Actuals)":null,"Outgoing(Actuals)- Target 110":null,"Insights":null},{"Month":"Mar 26","Date":"2026-03-23","Incoming Cases(Actuals)":83.0,"Backlog(Actuals)":998.0,"Outgoing(Actuals)- Target 110":201.0,"Insights":"Intake Impact : 34 Cases\nDE Impact : 9 Cases \nMonitoring Impact : 10 Cases"},{"Month":"Mar 26","Date":"2026-03-24","Incoming Cases(Actuals)":129.0,"Backlog(Actuals)":928.0,"Outgoing(Actuals)- Target 110":153.0,"Insights":"Intake Impact : 34 Cases\nMonitoring Impact : 10 Cases"},{"Month":"Mar 26","Date":"2026-03-25","Incoming Cases(Actuals)":90.0,"Backlog(Actuals)":949.0,"Outgoing(Actuals)- Target 110":152.0,"Insights":"Intake Impact : 17 Cases"},{"Month":"Mar 26","Date":"2026-03-26","Incoming Cases(Actuals)":142.0,"Backlog(Actuals)":1005.0,"Outgoing(Actuals)- Target 110":137.0,"Insights":"Intake Impact : 17 Cases\nDE Impact : 30 Cases \nMonitoring Impact : 10 Cases"},{"Month":"Mar 26","Date":"2026-03-27","Incoming Cases(Actuals)":84.0,"Backlog(Actuals)":919.0,"Outgoing(Actuals)- Target 110":127.0,"Insights":"Intake Impact : 17 Cases\nDE Impact : 14 Cases \nQR Impact : 7 Cases"},{"Month":"Mar 26","Date":"2026-03-28","Incoming Cases(Actuals)":0.0,"Backlog(Actuals)":0.0,"Outgoing(Actuals)- Target 110":0.0,"Insights":null},{"Month":"Mar 26","Date":"2026-03-29","Incoming Cases(Actuals)":null,"Backlog(Actuals)":null,"Outgoing(Actuals)- Target 110":null,"Insights":null},{"Month":"Mar 26","Date":"2026-03-30","Incoming Cases(Actuals)":166.0,"Backlog(Actuals)":1069.0,"Outgoing(Actuals)- Target 110":200.0,"Insights":"Intake Impact : 17 Cases"},{"Month":"Mar 26","Date":"2026-03-31","Incoming Cases(Actuals)":164.0,"Backlog(Actuals)":1020.0,"Outgoing(Actuals)- Target 110":144.0,"Insights":"Intake Impact : 17 Cases"}],"Absenteeism":[{"Month": "Jan 26", "Date": "2026-01-01", "DE": 0.0, "DE / QC": 0, "Intake": 0, "LSMV/LSIT": 0, "Mailbox": 0, "Monitoring": 0, "MR": 0, "Navax": 0, "QC": 0.0, "Total": 0.0}, {"Month": "Jan 26", "Date": "2026-01-02", "DE": 3.0, "DE / QC": 0, "Intake": 1, "LSMV/LSIT": 1, "Mailbox": 0, "Monitoring": 0, "MR": 3, "Navax": 0, "QC": 2.0, "Total": 10.0}, {"Month": "Jan 26", "Date": "2026-01-05", "DE": 2.0, "DE / QC": 0, "Intake": 1, "LSMV/LSIT": 0, "Mailbox": 0, "Monitoring": 0, "MR": 2, "Navax": 0, "QC": 2.0, "Total": 7.0}, {"Month": "Jan 26", "Date": "2026-01-06", "DE": 3.0, "DE / QC": 0, "Intake": 1, "LSMV/LSIT": 0, "Mailbox": 0, "Monitoring": 0, "MR": 1, "Navax": 0, "QC": 1.0, "Total": 6.0}, {"Month": "Jan 26", "Date": "2026-01-07", "DE": 5.0, "DE / QC": 0, "Intake": 0, "LSMV/LSIT": 0, "Mailbox": 0, "Monitoring": 0, "MR": 2, "Navax": 0, "QC": 1.0, "Total": 8.0}, {"Month": "Jan 26", "Date": "2026-01-08", "DE": 4.0, "DE / QC": 0, "Intake": 0, "LSMV/LSIT": 0, "Mailbox": 0, "Monitoring": 1, "MR": 2, "Navax": 0, "QC": 1.0, "Total": 8.0}, {"Month": "Jan 26", "Date": "2026-01-09", "DE": 3.0, "DE / QC": 0, "Intake": 1, "LSMV/LSIT": 0, "Mailbox": 1, "Monitoring": 1, "MR": 1, "Navax": 0, "QC": 1.0, "Total": 8.0}, {"Month": "Jan 26", "Date": "2026-01-12", "DE": 2.0, "DE / QC": 0, "Intake": 0, "LSMV/LSIT": 1, "Mailbox": 0, "Monitoring": 1, "MR": 2, "Navax": 0, "QC": 1.0, "Total": 7.0}, {"Month": "Jan 26", "Date": "2026-01-13", "DE": 1.0, "DE / QC": 0, "Intake": 1, "LSMV/LSIT": 0, "Mailbox": 0, "Monitoring": 1, "MR": 1, "Navax": 0, "QC": 1.0, "Total": 5.0}, {"Month": "Jan 26", "Date": "2026-01-14", "DE": 3.0, "DE / QC": 0, "Intake": 1, "LSMV/LSIT": 0, "Mailbox": 0, "Monitoring": 1, "MR": 1, "Navax": 0, "QC": 3.0, "Total": 9.0}, {"Month": "Jan 26", "Date": "2026-01-15", "DE": 0.0, "DE / QC": 0, "Intake": 0, "LSMV/LSIT": 0, "Mailbox": 0, "Monitoring": 0, "MR": 0, "Navax": 0, "QC": 0.0, "Total": 0.0}, {"Month": "Jan 26", "Date": "2026-01-16", "DE": 1.0, "DE / QC": 0, "Intake": 1, "LSMV/LSIT": 0, "Mailbox": 0, "Monitoring": 0, "MR": 1, "Navax": 0, "QC": 2.0, "Total": 5.0}, {"Month": "Jan 26", "Date": "2026-01-19", "DE": 2.0, "DE / QC": 0, "Intake": 2, "LSMV/LSIT": 0, "Mailbox": 0, "Monitoring": 0, "MR": 1, "Navax": 0, "QC": 2.0, "Total": 7.0}, {"Month": "Jan 26", "Date": "2026-01-20", "DE": 3.0, "DE / QC": 0, "Intake": 1, "LSMV/LSIT": 0, "Mailbox": 0, "Monitoring": 0, "MR": 1, "Navax": 0, "QC": 1.0, "Total": 6.0}, {"Month": "Jan 26", "Date": "2026-01-21", "DE": 3.0, "DE / QC": 0, "Intake": 1, "LSMV/LSIT": 0, "Mailbox": 0, "Monitoring": 0, "MR": 1, "Navax": 0, "QC": 1.0, "Total": 6.0}, {"Month": "Jan 26", "Date": "2026-01-22", "DE": 2.0, "DE / QC": 0, "Intake": 1, "LSMV/LSIT": 0, "Mailbox": 0, "Monitoring": 0, "MR": 1, "Navax": 0, "QC": 1.0, "Total": 5.0}, {"Month": "Jan 26", "Date": "2026-01-23", "DE": 2.0, "DE / QC": 0, "Intake": 0, "LSMV/LSIT": 0, "Mailbox": 0, "Monitoring": 0, "MR": 2, "Navax": 0, "QC": 1.0, "Total": 5.0}, {"Month": "Jan 26", "Date": "2026-01-26", "DE": 0.0, "DE / QC": 0, "Intake": 0, "LSMV/LSIT": 0, "Mailbox": 0, "Monitoring": 0, "MR": 0, "Navax": 0, "QC": 0.0, "Total": 0.0}, {"Month": "Jan 26", "Date": "2026-01-27", "DE": 3.0, "DE / QC": 0, "Intake": 1, "LSMV/LSIT": 0, "Mailbox": 1, "Monitoring": 0, "MR": 2, "Navax": 0, "QC": 1.0, "Total": 8.0}, {"Month": "Jan 26", "Date": "2026-01-28", "DE": 3.0, "DE / QC": 0, "Intake": 0, "LSMV/LSIT": 0, "Mailbox": 0, "Monitoring": 0, "MR": 0, "Navax": 0, "QC": 1.0, "Total": 4.0}, {"Month": "Jan 26", "Date": "2026-01-29", "DE": 2.0, "DE / QC": 0, "Intake": 0, "LSMV/LSIT": 0, "Mailbox": 0, "Monitoring": 0, "MR": 0, "Navax": 0, "QC": 2.0, "Total": 4.0}, {"Month": "Jan 26", "Date": "2026-01-30", "DE": 1.0, "DE / QC": 0, "Intake": 1, "LSMV/LSIT": 0, "Mailbox": 0, "Monitoring": 0, "MR": 1, "Navax": 0, "QC": 2.0, "Total": 5.0}, {"Month": "Feb 26", "Date": "2026-02-02", "DE": 1.0, "DE / QC": 0, "Intake": 1, "LSMV/LSIT": 1, "Mailbox": 0, "Monitoring": 0, "MR": 2, "Navax": 0, "QC": 2.0, "Total": 7.0}, {"Month": "Feb 26", "Date": "2026-02-03", "DE": 1.0, "DE / QC": 0, "Intake": 0, "LSMV/LSIT": 1, "Mailbox": 0, "Monitoring": 0, "MR": 2, "Navax": 0, "QC": 3.0, "Total": 7.0}, {"Month": "Feb 26", "Date": "2026-02-04", "DE": 1.0, "DE / QC": 0, "Intake": 1, "LSMV/LSIT": 0, "Mailbox": 1, "Monitoring": 0, "MR": 2, "Navax": 0, "QC": 2.0, "Total": 7.0}, {"Month": "Feb 26", "Date": "2026-02-05", "DE": 2.0, "DE / QC": 0, "Intake": 0, "LSMV/LSIT": 0, "Mailbox": 1, "Monitoring": 0, "MR": 0, "Navax": 0, "QC": 2.0, "Total": 5.0}, {"Month": "Feb 26", "Date": "2026-02-06", "DE": 0.0, "DE / QC": 0, "Intake": 1, "LSMV/LSIT": 0, "Mailbox": 0, "Monitoring": 1, "MR": 1, "Navax": 0, "QC": 2.0, "Total": 5.0}, {"Month": "Feb 26", "Date": "2026-02-09", "DE": 1.0, "DE / QC": 0, "Intake": 1, "LSMV/LSIT": 1, "Mailbox": 0, "Monitoring": 0, "MR": 1, "Navax": 0, "QC": 3.0, "Total": 7.0}, {"Month": "Feb 26", "Date": "2026-02-10", "DE": 1.0, "DE / QC": 0, "Intake": 0, "LSMV/LSIT": 0, "Mailbox": 0, "Monitoring": 1, "MR": 1, "Navax": 0, "QC": 4.0, "Total": 7.0}, {"Month": "Feb 26", "Date": "2026-02-11", "DE": 3.0, "DE / QC": 0, "Intake": 0, "LSMV/LSIT": 0, "Mailbox": 0, "Monitoring": 0, "MR": 1, "Navax": 0, "QC": 3.0, "Total": 7.0}, {"Month": "Feb 26", "Date": "2026-02-12", "DE": 1.0, "DE / QC": 0, "Intake": 0, "LSMV/LSIT": 0, "Mailbox": 0, "Monitoring": 0, "MR": 1, "Navax": 0, "QC": 1.0, "Total": 3.0}, {"Month": "Feb 26", "Date": "2026-02-13", "DE": 1.0, "DE / QC": 0, "Intake": 0, "LSMV/LSIT": 0, "Mailbox": 1, "Monitoring": 0, "MR": 1, "Navax": 0, "QC": 1.0, "Total": 4.0}, {"Month": "Feb 26", "Date": "2026-02-16", "DE": 4.0, "DE / QC": 0, "Intake": 2, "LSMV/LSIT": 0, "Mailbox": 1, "Monitoring": 0, "MR": 0, "Navax": 0, "QC": 0.0, "Total": 7.0}, {"Month": "Feb 26", "Date": "2026-02-17", "DE": 1.0, "DE / QC": 0, "Intake": 0, "LSMV/LSIT": 0, "Mailbox": 0, "Monitoring": 0, "MR": 0, "Navax": 0, "QC": 0.0, "Total": 1.0}, {"Month": "Feb 26", "Date": "2026-02-18", "DE": 1.0, "DE / QC": 0, "Intake": 1, "LSMV/LSIT": 0, "Mailbox": 0, "Monitoring": 1, "MR": 0, "Navax": 0, "QC": 0.0, "Total": 3.0}, {"Month": "Feb 26", "Date": "2026-02-19", "DE": 4.0, "DE / QC": 0, "Intake": 2, "LSMV/LSIT": 0, "Mailbox": 1, "Monitoring": 0, "MR": 1, "Navax": 0, "QC": 0.0, "Total": 8.0}, {"Month": "Feb 26", "Date": "2026-02-20", "DE": 5.0, "DE / QC": 0, "Intake": 1, "LSMV/LSIT": 0, "Mailbox": 1, "Monitoring": 0, "MR": 1, "Navax": 0, "QC": 0.0, "Total": 8.0}, {"Month": "Feb 26", "Date": "2026-02-23", "DE": 1.5, "DE / QC": 0, "Intake": 0, "LSMV/LSIT": 0, "Mailbox": 0, "Monitoring": 0, "MR": 1, "Navax": 0, "QC": 1.0, "Total": 3.5}, {"Month": "Feb 26", "Date": "2026-02-24", "DE": 2.5, "DE / QC": 0, "Intake": 0, "LSMV/LSIT": 0, "Mailbox": 0, "Monitoring": 0, "MR": 2, "Navax": 0, "QC": 0.0, "Total": 4.5}, {"Month": "Feb 26", "Date": "2026-02-25", "DE": 2.0, "DE / QC": 0, "Intake": 2, "LSMV/LSIT": 0, "Mailbox": 1, "Monitoring": 1, "MR": 0, "Navax": 0, "QC": 0.0, "Total": 6.0}, {"Month": "Feb 26", "Date": "2026-02-26", "DE": 1.0, "DE / QC": 0, "Intake": 0, "LSMV/LSIT": 0, "Mailbox": 0, "Monitoring": 1, "MR": 1, "Navax": 0, "QC": 0.0, "Total": 3.0}, {"Month": "Feb 26", "Date": "2026-02-27", "DE": 0.0, "DE / QC": 0, "Intake": 0, "LSMV/LSIT": 0, "Mailbox": 0, "Monitoring": 1, "MR": 1, "Navax": 0, "QC": 1.0, "Total": 3.0}, {"Month": "Mar 26", "Date": "2026-03-02", "DE": 2.0, "DE / QC": 0, "Intake": 0, "LSMV/LSIT": 0, "Mailbox": 0, "Monitoring": 0, "MR": 1, "Navax": 0, "QC": 2.5, "Total": 5.5}, {"Month": "Mar 26", "Date": "2026-03-03", "DE": 0.0, "DE / QC": 0, "Intake": 0, "LSMV/LSIT": 0, "Mailbox": 0, "Monitoring": 0, "MR": 0, "Navax": 0, "QC": 0.0, "Total": 0.0}, {"Month": "Mar 26", "Date": "2026-03-04", "DE": 0.0, "DE / QC": 0, "Intake": 0, "LSMV/LSIT": 0, "Mailbox": 0, "Monitoring": 0, "MR": 2, "Navax": 0, "QC": 0.0, "Total": 2.0}, {"Month": "Mar 26", "Date": "2026-03-05", "DE": 2.0, "DE / QC": 0, "Intake": 0, "LSMV/LSIT": 0, "Mailbox": 0, "Monitoring": 0, "MR": 1, "Navax": 0, "QC": 0.0, "Total": 3.0}, {"Month": "Mar 26", "Date": "2026-03-06", "DE": 1.0, "DE / QC": 0, "Intake": 0, "LSMV/LSIT": 0, "Mailbox": 0, "Monitoring": 0, "MR": 1, "Navax": 0, "QC": 0.0, "Total": 2.0}, {"Month": "Mar 26", "Date": "2026-03-09", "DE": 1.0, "DE / QC": 0, "Intake": 1, "LSMV/LSIT": 0, "Mailbox": 0, "Monitoring": 0, "MR": 3, "Navax": 0, "QC": 0.0, "Total": 5.0}, {"Month": "Mar 26", "Date": "2026-03-10", "DE": 1.0, "DE / QC": 0, "Intake": 1, "LSMV/LSIT": 0, "Mailbox": 0, "Monitoring": 0, "MR": 2, "Navax": 0, "QC": 1.0, "Total": 5.0}, {"Month": "Mar 26", "Date": "2026-03-11", "DE": 0.0, "DE / QC": 0, "Intake": 2, "LSMV/LSIT": 0, "Mailbox": 0, "Monitoring": 0, "MR": 1, "Navax": 0, "QC": 1.0, "Total": 4.0}, {"Month": "Mar 26", "Date": "2026-03-12", "DE": 0.0, "DE / QC": 0, "Intake": 1, "LSMV/LSIT": 0, "Mailbox": 0, "Monitoring": 0, "MR": 0, "Navax": 0, "QC": 0.0, "Total": 1.0}, {"Month": "Mar 26", "Date": "2026-03-13", "DE": 0.0, "DE / QC": 0, "Intake": 1, "LSMV/LSIT": 0, "Mailbox": 0, "Monitoring": 0, "MR": 3, "Navax": 0, "QC": 0.0, "Total": 4.0}, {"Month": "Mar 26", "Date": "2026-03-16", "DE": 1.0, "DE / QC": 0, "Intake": 0, "LSMV/LSIT": 0, "Mailbox": 0, "Monitoring": 0, "MR": 1, "Navax": 0, "QC": 1.0, "Total": 3.0}, {"Month": "Mar 26", "Date": "2026-03-17", "DE": 0.0, "DE / QC": 0, "Intake": 1, "LSMV/LSIT": 1, "Mailbox": 0, "Monitoring": 0, "MR": 0, "Navax": 0, "QC": 1.0, "Total": 3.0}, {"Month": "Mar 26", "Date": "2026-03-18", "DE": 1.0, "DE / QC": 0, "Intake": 2, "LSMV/LSIT": 1, "Mailbox": 0, "Monitoring": 0, "MR": 1, "Navax": 0, "QC": 2.0, "Total": 7.0}, {"Month": "Mar 26", "Date": "2026-03-19", "DE": 4.0, "DE / QC": 0, "Intake": 3, "LSMV/LSIT": 1, "Mailbox": 0, "Monitoring": 0, "MR": 1, "Navax": 0, "QC": 1.0, "Total": 10.0}, {"Month": "Mar 26", "Date": "2026-03-20", "DE": 0.0, "DE / QC": 0, "Intake": 0, "LSMV/LSIT": 0, "Mailbox": 0, "Monitoring": 0, "MR": 0, "Navax": 0, "QC": 0.0, "Total": 0.0}, {"Month": "Mar 26", "Date": "2026-03-23", "DE": 1.0, "DE / QC": 0, "Intake": 2, "LSMV/LSIT": 0, "Mailbox": 1, "Monitoring": 0, "MR": 2, "Navax": 0, "QC": 0.0, "Total": 6.0}, {"Month": "Mar 26", "Date": "2026-03-24", "DE": 0.0, "DE / QC": 0, "Intake": 2, "LSMV/LSIT": 0, "Mailbox": 1, "Monitoring": 0, "MR": 1, "Navax": 0, "QC": 0.0, "Total": 4.0}, {"Month": "Mar 26", "Date": "2026-03-25", "DE": 0.0, "DE / QC": 0, "Intake": 1, "LSMV/LSIT": 0, "Mailbox": 0, "Monitoring": 0, "MR": 0, "Navax": 0, "QC": 0.0, "Total": 1.0}, {"Month": "Mar 26", "Date": "2026-03-26", "DE": 3.0, "DE / QC": 0, "Intake": 2, "LSMV/LSIT": 0, "Mailbox": 1, "Monitoring": 0, "MR": 1, "Navax": 0, "QC": 0.0, "Total": 7.0}, {"Month": "Mar 26", "Date": "2026-03-27", "DE": 2.0, "DE / QC": 0, "Intake": 1, "LSMV/LSIT": 0, "Mailbox": 0, "Monitoring": 0, "MR": 2, "Navax": 0, "QC": 1.0, "Total": 6.0}, {"Month": "Mar 26", "Date": "2026-03-30", "DE": 0.0, "DE / QC": 0, "Intake": 1, "LSMV/LSIT": 0, "Mailbox": 0, "Monitoring": 0, "MR": 0, "Navax": 0, "QC": 0.0, "Total": 1.0}, {"Month": "Mar 26", "Date": "2026-03-31", "DE": 0.0, "DE / QC": 0, "Intake": 1, "LSMV/LSIT": 0, "Mailbox": 0, "Monitoring": 0, "MR": 1, "Navax": 0, "QC": 0.0, "Total": 2.0}],"Present HC":[{"Month":"Jan 26","Date":"2026-01-01","DE":9.0,"DE / QC":4.0,"Intake":5.0,"LSMV/LSIT":4.0,"Mailbox":3.0,"Monitoring":3.0,"MR":9.0,"Navax":8.0,"QC":6.0,"Total":51.0},{"Month":"Jan 26","Date":"2026-01-02","DE":6.0,"DE / QC":4.0,"Intake":4.0,"LSMV/LSIT":3.0,"Mailbox":3.0,"Monitoring":3.0,"MR":6.0,"Navax":8.0,"QC":4.0,"Total":41.0},{"Month":"Jan 26","Date":"2026-01-05","DE":7.0,"DE / QC":4.0,"Intake":4.0,"LSMV/LSIT":4.0,"Mailbox":3.0,"Monitoring":3.0,"MR":7.0,"Navax":8.0,"QC":4.0,"Total":44.0},{"Month":"Jan 26","Date":"2026-01-06","DE":6.0,"DE / QC":4.0,"Intake":4.0,"LSMV/LSIT":4.0,"Mailbox":3.0,"Monitoring":3.0,"MR":8.0,"Navax":8.0,"QC":5.0,"Total":45.0},{"Month":"Jan 26","Date":"2026-01-07","DE":4.0,"DE / QC":4.0,"Intake":5.0,"LSMV/LSIT":4.0,"Mailbox":3.0,"Monitoring":3.0,"MR":7.0,"Navax":8.0,"QC":5.0,"Total":43.0},{"Month":"Jan 26","Date":"2026-01-08","DE":5.0,"DE / QC":4.0,"Intake":5.0,"LSMV/LSIT":4.0,"Mailbox":3.0,"Monitoring":2.0,"MR":7.0,"Navax":8.0,"QC":5.0,"Total":43.0},{"Month":"Jan 26","Date":"2026-01-09","DE":6.0,"DE / QC":4.0,"Intake":4.0,"LSMV/LSIT":4.0,"Mailbox":2.0,"Monitoring":2.0,"MR":8.0,"Navax":8.0,"QC":5.0,"Total":43.0},{"Month":"Jan 26","Date":"2026-01-12","DE":7.0,"DE / QC":4.0,"Intake":5.0,"LSMV/LSIT":3.0,"Mailbox":3.0,"Monitoring":2.0,"MR":7.0,"Navax":8.0,"QC":5.0,"Total":44.0},{"Month":"Jan 26","Date":"2026-01-13","DE":8.0,"DE / QC":4.0,"Intake":4.0,"LSMV/LSIT":4.0,"Mailbox":3.0,"Monitoring":2.0,"MR":8.0,"Navax":8.0,"QC":5.0,"Total":46.0},{"Month":"Jan 26","Date":"2026-01-14","DE":6.0,"DE / QC":4.0,"Intake":4.0,"LSMV/LSIT":4.0,"Mailbox":3.0,"Monitoring":2.0,"MR":8.0,"Navax":8.0,"QC":3.0,"Total":42.0},{"Month":"Jan 26","Date":"2026-01-15","DE":9.0,"DE / QC":4.0,"Intake":5.0,"LSMV/LSIT":4.0,"Mailbox":3.0,"Monitoring":3.0,"MR":9.0,"Navax":8.0,"QC":6.0,"Total":51.0},{"Month":"Jan 26","Date":"2026-01-16","DE":8.0,"DE / QC":4.0,"Intake":4.0,"LSMV/LSIT":4.0,"Mailbox":3.0,"Monitoring":3.0,"MR":8.0,"Navax":8.0,"QC":4.0,"Total":46.0},{"Month":"Jan 26","Date":"2026-01-19","DE":7.0,"DE / QC":4.0,"Intake":3.0,"LSMV/LSIT":4.0,"Mailbox":3.0,"Monitoring":3.0,"MR":8.0,"Navax":8.0,"QC":4.0,"Total":44.0},{"Month":"Jan 26","Date":"2026-01-20","DE":6.0,"DE / QC":4.0,"Intake":4.0,"LSMV/LSIT":4.0,"Mailbox":3.0,"Monitoring":3.0,"MR":8.0,"Navax":8.0,"QC":5.0,"Total":45.0},{"Month":"Jan 26","Date":"2026-01-21","DE":6.0,"DE / QC":4.0,"Intake":4.0,"LSMV/LSIT":4.0,"Mailbox":3.0,"Monitoring":3.0,"MR":8.0,"Navax":8.0,"QC":5.0,"Total":45.0},{"Month":"Jan 26","Date":"2026-01-22","DE":7.0,"DE / QC":4.0,"Intake":4.0,"LSMV/LSIT":4.0,"Mailbox":3.0,"Monitoring":3.0,"MR":8.0,"Navax":8.0,"QC":5.0,"Total":46.0},{"Month":"Jan 26","Date":"2026-01-23","DE":7.0,"DE / QC":4.0,"Intake":5.0,"LSMV/LSIT":4.0,"Mailbox":3.0,"Monitoring":3.0,"MR":7.0,"Navax":8.0,"QC":5.0,"Total":46.0},{"Month":"Jan 26","Date":"2026-01-26","DE":9.0,"DE / QC":4.0,"Intake":5.0,"LSMV/LSIT":4.0,"Mailbox":3.0,"Monitoring":3.0,"MR":9.0,"Navax":8.0,"QC":6.0,"Total":51.0},{"Month":"Jan 26","Date":"2026-01-27","DE":6.0,"DE / QC":4.0,"Intake":4.0,"LSMV/LSIT":4.0,"Mailbox":2.0,"Monitoring":3.0,"MR":7.0,"Navax":8.0,"QC":5.0,"Total":43.0},{"Month":"Jan 26","Date":"2026-01-28","DE":6.0,"DE / QC":4.0,"Intake":5.0,"LSMV/LSIT":4.0,"Mailbox":3.0,"Monitoring":3.0,"MR":9.0,"Navax":8.0,"QC":5.0,"Total":47.0},{"Month":"Jan 26","Date":"2026-01-29","DE":7.0,"DE / QC":4.0,"Intake":5.0,"LSMV/LSIT":4.0,"Mailbox":3.0,"Monitoring":3.0,"MR":9.0,"Navax":8.0,"QC":4.0,"Total":47.0},{"Month":"Jan 26","Date":"2026-01-30","DE":8.0,"DE / QC":4.0,"Intake":4.0,"LSMV/LSIT":4.0,"Mailbox":3.0,"Monitoring":3.0,"MR":8.0,"Navax":8.0,"QC":4.0,"Total":46.0},{"Month":"Feb 26","Date":"2026-02-02","DE":8.0,"DE / QC":4.0,"Intake":4.0,"LSMV/LSIT":3.0,"Mailbox":3.0,"Monitoring":3.0,"MR":7.0,"Navax":8.0,"QC":4.0,"Total":44.0},{"Month":"Feb 26","Date":"2026-02-03","DE":8.0,"DE / QC":4.0,"Intake":5.0,"LSMV/LSIT":3.0,"Mailbox":3.0,"Monitoring":3.0,"MR":7.0,"Navax":8.0,"QC":3.0,"Total":44.0},{"Month":"Feb 26","Date":"2026-02-04","DE":8.0,"DE / QC":4.0,"Intake":4.0,"LSMV/LSIT":4.0,"Mailbox":2.0,"Monitoring":3.0,"MR":7.0,"Navax":8.0,"QC":4.0,"Total":44.0},{"Month":"Feb 26","Date":"2026-02-05","DE":7.0,"DE / QC":4.0,"Intake":5.0,"LSMV/LSIT":4.0,"Mailbox":2.0,"Monitoring":3.0,"MR":9.0,"Navax":8.0,"QC":4.0,"Total":46.0},{"Month":"Feb 26","Date":"2026-02-06","DE":9.0,"DE / QC":4.0,"Intake":4.0,"LSMV/LSIT":4.0,"Mailbox":3.0,"Monitoring":2.0,"MR":8.0,"Navax":8.0,"QC":4.0,"Total":46.0},{"Month":"Feb 26","Date":"2026-02-09","DE":8.0,"DE / QC":4.0,"Intake":4.0,"LSMV/LSIT":3.0,"Mailbox":3.0,"Monitoring":3.0,"MR":8.0,"Navax":8.0,"QC":3.0,"Total":44.0},{"Month":"Feb 26","Date":"2026-02-10","DE":8.0,"DE / QC":4.0,"Intake":5.0,"LSMV/LSIT":4.0,"Mailbox":3.0,"Monitoring":2.0,"MR":8.0,"Navax":8.0,"QC":2.0,"Total":44.0},{"Month":"Feb 26","Date":"2026-02-11","DE":6.0,"DE / QC":4.0,"Intake":5.0,"LSMV/LSIT":4.0,"Mailbox":3.0,"Monitoring":3.0,"MR":8.0,"Navax":8.0,"QC":3.0,"Total":44.0},{"Month":"Feb 26","Date":"2026-02-12","DE":8.0,"DE / QC":4.0,"Intake":5.0,"LSMV/LSIT":4.0,"Mailbox":3.0,"Monitoring":3.0,"MR":8.0,"Navax":8.0,"QC":5.0,"Total":48.0},{"Month":"Feb 26","Date":"2026-02-13","DE":8.0,"DE / QC":4.0,"Intake":5.0,"LSMV/LSIT":4.0,"Mailbox":2.0,"Monitoring":3.0,"MR":8.0,"Navax":8.0,"QC":5.0,"Total":47.0},{"Month":"Feb 26","Date":"2026-02-16","DE":5.0,"DE / QC":4.0,"Intake":3.0,"LSMV/LSIT":4.0,"Mailbox":2.0,"Monitoring":3.0,"MR":9.0,"Navax":8.0,"QC":6.0,"Total":44.0},{"Month":"Feb 26","Date":"2026-02-17","DE":8.0,"DE / QC":4.0,"Intake":5.0,"LSMV/LSIT":4.0,"Mailbox":3.0,"Monitoring":3.0,"MR":9.0,"Navax":8.0,"QC":6.0,"Total":50.0},{"Month":"Feb 26","Date":"2026-02-18","DE":8.0,"DE / QC":4.0,"Intake":4.0,"LSMV/LSIT":4.0,"Mailbox":3.0,"Monitoring":2.0,"MR":9.0,"Navax":8.0,"QC":6.0,"Total":48.0},{"Month":"Feb 26","Date":"2026-02-19","DE":5.0,"DE / QC":4.0,"Intake":3.0,"LSMV/LSIT":4.0,"Mailbox":2.0,"Monitoring":3.0,"MR":8.0,"Navax":8.0,"QC":6.0,"Total":43.0},{"Month":"Feb 26","Date":"2026-02-20","DE":4.0,"DE / QC":4.0,"Intake":4.0,"LSMV/LSIT":4.0,"Mailbox":2.0,"Monitoring":3.0,"MR":8.0,"Navax":8.0,"QC":6.0,"Total":43.0},{"Month":"Feb 26","Date":"2026-02-23","DE":7.5,"DE / QC":4.0,"Intake":5.0,"LSMV/LSIT":4.0,"Mailbox":3.0,"Monitoring":3.0,"MR":8.0,"Navax":8.0,"QC":5.0,"Total":47.5},{"Month":"Feb 26","Date":"2026-02-24","DE":6.5,"DE / QC":4.0,"Intake":5.0,"LSMV/LSIT":4.0,"Mailbox":3.0,"Monitoring":3.0,"MR":7.0,"Navax":8.0,"QC":6.0,"Total":46.5},{"Month":"Feb 26","Date":"2026-02-25","DE":7.0,"DE / QC":4.0,"Intake":3.0,"LSMV/LSIT":4.0,"Mailbox":2.0,"Monitoring":2.0,"MR":9.0,"Navax":8.0,"QC":6.0,"Total":45.0},{"Month":"Feb 26","Date":"2026-02-26","DE":8.0,"DE / QC":4.0,"Intake":5.0,"LSMV/LSIT":4.0,"Mailbox":3.0,"Monitoring":2.0,"MR":8.0,"Navax":8.0,"QC":6.0,"Total":48.0},{"Month":"Feb 26","Date":"2026-02-27","DE":9.0,"DE / QC":4.0,"Intake":5.0,"LSMV/LSIT":4.0,"Mailbox":3.0,"Monitoring":2.0,"MR":8.0,"Navax":8.0,"QC":5.0,"Total":48.0},{"Month":"Mar 26","Date":"2026-03-02","DE":7.0,"DE / QC":4.0,"Intake":5.0,"LSMV/LSIT":4.0,"Mailbox":3.0,"Monitoring":3.0,"MR":8.0,"Navax":8.0,"QC":3.5,"Total":45.5},{"Month":"Mar 26","Date":"2026-03-03","DE":9.0,"DE / QC":4.0,"Intake":5.0,"LSMV/LSIT":4.0,"Mailbox":3.0,"Monitoring":3.0,"MR":9.0,"Navax":8.0,"QC":6.0,"Total":51.0},{"Month":"Mar 26","Date":"2026-03-04","DE":9.0,"DE / QC":4.0,"Intake":5.0,"LSMV/LSIT":4.0,"Mailbox":3.0,"Monitoring":3.0,"MR":7.0,"Navax":8.0,"QC":6.0,"Total":49.0},{"Month":"Mar 26","Date":"2026-03-05","DE":7.0,"DE / QC":4.0,"Intake":5.0,"LSMV/LSIT":4.0,"Mailbox":3.0,"Monitoring":3.0,"MR":8.0,"Navax":8.0,"QC":6.0,"Total":48.0},{"Month":"Mar 26","Date":"2026-03-06","DE":8.0,"DE / QC":4.0,"Intake":5.0,"LSMV/LSIT":4.0,"Mailbox":3.0,"Monitoring":3.0,"MR":8.0,"Navax":8.0,"QC":6.0,"Total":49.0},{"Month":"Mar 26","Date":"2026-03-09","DE":8.0,"DE / QC":4.0,"Intake":4.0,"LSMV/LSIT":4.0,"Mailbox":3.0,"Monitoring":3.0,"MR":6.0,"Navax":8.0,"QC":6.0,"Total":46.0},{"Month":"Mar 26","Date":"2026-03-10","DE":8.0,"DE / QC":4.0,"Intake":4.0,"LSMV/LSIT":4.0,"Mailbox":3.0,"Monitoring":3.0,"MR":7.0,"Navax":8.0,"QC":5.0,"Total":46.0},{"Month":"Mar 26","Date":"2026-03-11","DE":9.0,"DE / QC":4.0,"Intake":3.0,"LSMV/LSIT":4.0,"Mailbox":3.0,"Monitoring":3.0,"MR":8.0,"Navax":8.0,"QC":5.0,"Total":47.0},{"Month":"Mar 26","Date":"2026-03-12","DE":9.0,"DE / QC":4.0,"Intake":4.0,"LSMV/LSIT":4.0,"Mailbox":3.0,"Monitoring":3.0,"MR":9.0,"Navax":8.0,"QC":6.0,"Total":50.0},{"Month":"Mar 26","Date":"2026-03-13","DE":9.0,"DE / QC":4.0,"Intake":4.0,"LSMV/LSIT":4.0,"Mailbox":3.0,"Monitoring":3.0,"MR":6.0,"Navax":8.0,"QC":6.0,"Total":47.0},{"Month":"Mar 26","Date":"2026-03-16","DE":8.0,"DE / QC":4.0,"Intake":5.0,"LSMV/LSIT":4.0,"Mailbox":3.0,"Monitoring":3.0,"MR":8.0,"Navax":8.0,"QC":5.0,"Total":48.0},{"Month":"Mar 26","Date":"2026-03-17","DE":9.0,"DE / QC":4.0,"Intake":4.0,"LSMV/LSIT":3.0,"Mailbox":3.0,"Monitoring":3.0,"MR":9.0,"Navax":8.0,"QC":5.0,"Total":48.0},{"Month":"Mar 26","Date":"2026-03-18","DE":8.0,"DE / QC":4.0,"Intake":3.0,"LSMV/LSIT":3.0,"Mailbox":3.0,"Monitoring":3.0,"MR":8.0,"Navax":8.0,"QC":4.0,"Total":44.0},{"Month":"Mar 26","Date":"2026-03-19","DE":5.0,"DE / QC":4.0,"Intake":2.0,"LSMV/LSIT":3.0,"Mailbox":3.0,"Monitoring":3.0,"MR":8.0,"Navax":8.0,"QC":5.0,"Total":41.0},{"Month":"Mar 26","Date":"2026-03-20","DE":9.0,"DE / QC":4.0,"Intake":5.0,"LSMV/LSIT":4.0,"Mailbox":3.0,"Monitoring":3.0,"MR":9.0,"Navax":8.0,"QC":6.0,"Total":51.0},{"Month":"Mar 26","Date":"2026-03-23","DE":8.0,"DE / QC":4.0,"Intake":3.0,"LSMV/LSIT":4.0,"Mailbox":2.0,"Monitoring":3.0,"MR":7.0,"Navax":8.0,"QC":6.0,"Total":45.0},{"Month":"Mar 26","Date":"2026-03-24","DE":9.0,"DE / QC":4.0,"Intake":3.0,"LSMV/LSIT":4.0,"Mailbox":2.0,"Monitoring":3.0,"MR":8.0,"Navax":8.0,"QC":6.0,"Total":47.0},{"Month":"Mar 26","Date":"2026-03-25","DE":9.0,"DE / QC":4.0,"Intake":4.0,"LSMV/LSIT":4.0,"Mailbox":3.0,"Monitoring":3.0,"MR":9.0,"Navax":8.0,"QC":6.0,"Total":50.0},{"Month":"Mar 26","Date":"2026-03-26","DE":6.0,"DE / QC":4.0,"Intake":3.0,"LSMV/LSIT":4.0,"Mailbox":2.0,"Monitoring":3.0,"MR":8.0,"Navax":8.0,"QC":6.0,"Total":44.0},{"Month":"Mar 26","Date":"2026-03-27","DE":7.0,"DE / QC":4.0,"Intake":4.0,"LSMV/LSIT":4.0,"Mailbox":3.0,"Monitoring":3.0,"MR":7.0,"Navax":8.0,"QC":5.0,"Total":45.0},{"Month":"Mar 26","Date":"2026-03-30","DE":9.0,"DE / QC":4.0,"Intake":4.0,"LSMV/LSIT":4.0,"Mailbox":3.0,"Monitoring":3.0,"MR":9.0,"Navax":8.0,"QC":6.0,"Total":50.0},{"Month":"Mar 26","Date":"2026-03-31","DE":9.0,"DE / QC":4.0,"Intake":4.0,"LSMV/LSIT":4.0,"Mailbox":3.0,"Monitoring":3.0,"MR":8.0,"Navax":8.0,"QC":6.0,"Total":49.0}],"Total HC":[{"Month":"Jan 26","Date":"2026-01-01","DE":9,"DE / QC":4,"Intake":5,"LSMV/LSIT":4,"Mailbox":3,"Monitoring":3,"MR":9,"Navax":8,"QC":6,"Total ":51},{"Month":"Jan 26","Date":"2026-01-02","DE":9,"DE / QC":4,"Intake":5,"LSMV/LSIT":4,"Mailbox":3,"Monitoring":3,"MR":9,"Navax":8,"QC":6,"Total ":51},{"Month":"Jan 26","Date":"2026-01-05","DE":9,"DE / QC":4,"Intake":5,"LSMV/LSIT":4,"Mailbox":3,"Monitoring":3,"MR":9,"Navax":8,"QC":6,"Total ":51},{"Month":"Jan 26","Date":"2026-01-06","DE":9,"DE / QC":4,"Intake":5,"LSMV/LSIT":4,"Mailbox":3,"Monitoring":3,"MR":9,"Navax":8,"QC":6,"Total ":51},{"Month":"Jan 26","Date":"2026-01-07","DE":9,"DE / QC":4,"Intake":5,"LSMV/LSIT":4,"Mailbox":3,"Monitoring":3,"MR":9,"Navax":8,"QC":6,"Total ":51},{"Month":"Jan 26","Date":"2026-01-08","DE":9,"DE / QC":4,"Intake":5,"LSMV/LSIT":4,"Mailbox":3,"Monitoring":3,"MR":9,"Navax":8,"QC":6,"Total ":51},{"Month":"Jan 26","Date":"2026-01-09","DE":9,"DE / QC":4,"Intake":5,"LSMV/LSIT":4,"Mailbox":3,"Monitoring":3,"MR":9,"Navax":8,"QC":6,"Total ":51},{"Month":"Jan 26","Date":"2026-01-12","DE":9,"DE / QC":4,"Intake":5,"LSMV/LSIT":4,"Mailbox":3,"Monitoring":3,"MR":9,"Navax":8,"QC":6,"Total ":51},{"Month":"Jan 26","Date":"2026-01-13","DE":9,"DE / QC":4,"Intake":5,"LSMV/LSIT":4,"Mailbox":3,"Monitoring":3,"MR":9,"Navax":8,"QC":6,"Total ":51},{"Month":"Jan 26","Date":"2026-01-14","DE":9,"DE / QC":4,"Intake":5,"LSMV/LSIT":4,"Mailbox":3,"Monitoring":3,"MR":9,"Navax":8,"QC":6,"Total ":51},{"Month":"Jan 26","Date":"2026-01-15","DE":9,"DE / QC":4,"Intake":5,"LSMV/LSIT":4,"Mailbox":3,"Monitoring":3,"MR":9,"Navax":8,"QC":6,"Total ":51},{"Month":"Jan 26","Date":"2026-01-16","DE":9,"DE / QC":4,"Intake":5,"LSMV/LSIT":4,"Mailbox":3,"Monitoring":3,"MR":9,"Navax":8,"QC":6,"Total ":51},{"Month":"Jan 26","Date":"2026-01-19","DE":9,"DE / QC":4,"Intake":5,"LSMV/LSIT":4,"Mailbox":3,"Monitoring":3,"MR":9,"Navax":8,"QC":6,"Total ":51},{"Month":"Jan 26","Date":"2026-01-20","DE":9,"DE / QC":4,"Intake":5,"LSMV/LSIT":4,"Mailbox":3,"Monitoring":3,"MR":9,"Navax":8,"QC":6,"Total ":51},{"Month":"Jan 26","Date":"2026-01-21","DE":9,"DE / QC":4,"Intake":5,"LSMV/LSIT":4,"Mailbox":3,"Monitoring":3,"MR":9,"Navax":8,"QC":6,"Total ":51},{"Month":"Jan 26","Date":"2026-01-22","DE":9,"DE / QC":4,"Intake":5,"LSMV/LSIT":4,"Mailbox":3,"Monitoring":3,"MR":9,"Navax":8,"QC":6,"Total ":51},{"Month":"Jan 26","Date":"2026-01-23","DE":9,"DE / QC":4,"Intake":5,"LSMV/LSIT":4,"Mailbox":3,"Monitoring":3,"MR":9,"Navax":8,"QC":6,"Total ":51},{"Month":"Jan 26","Date":"2026-01-26","DE":9,"DE / QC":4,"Intake":5,"LSMV/LSIT":4,"Mailbox":3,"Monitoring":3,"MR":9,"Navax":8,"QC":6,"Total ":51},{"Month":"Jan 26","Date":"2026-01-27","DE":9,"DE / QC":4,"Intake":5,"LSMV/LSIT":4,"Mailbox":3,"Monitoring":3,"MR":9,"Navax":8,"QC":6,"Total ":51},{"Month":"Jan 26","Date":"2026-01-28","DE":9,"DE / QC":4,"Intake":5,"LSMV/LSIT":4,"Mailbox":3,"Monitoring":3,"MR":9,"Navax":8,"QC":6,"Total ":51},{"Month":"Jan 26","Date":"2026-01-29","DE":9,"DE / QC":4,"Intake":5,"LSMV/LSIT":4,"Mailbox":3,"Monitoring":3,"MR":9,"Navax":8,"QC":6,"Total ":51},{"Month":"Jan 26","Date":"2026-01-30","DE":9,"DE / QC":4,"Intake":5,"LSMV/LSIT":4,"Mailbox":3,"Monitoring":3,"MR":9,"Navax":8,"QC":6,"Total ":51},{"Month":"Feb 26","Date":"2026-02-02","DE":9,"DE / QC":4,"Intake":5,"LSMV/LSIT":4,"Mailbox":3,"Monitoring":3,"MR":9,"Navax":8,"QC":6,"Total ":51},{"Month":"Feb 26","Date":"2026-02-03","DE":9,"DE / QC":4,"Intake":5,"LSMV/LSIT":4,"Mailbox":3,"Monitoring":3,"MR":9,"Navax":8,"QC":6,"Total ":51},{"Month":"Feb 26","Date":"2026-02-04","DE":9,"DE / QC":4,"Intake":5,"LSMV/LSIT":4,"Mailbox":3,"Monitoring":3,"MR":9,"Navax":8,"QC":6,"Total ":51},{"Month":"Feb 26","Date":"2026-02-05","DE":9,"DE / QC":4,"Intake":5,"LSMV/LSIT":4,"Mailbox":3,"Monitoring":3,"MR":9,"Navax":8,"QC":6,"Total ":51},{"Month":"Feb 26","Date":"2026-02-06","DE":9,"DE / QC":4,"Intake":5,"LSMV/LSIT":4,"Mailbox":3,"Monitoring":3,"MR":9,"Navax":8,"QC":6,"Total ":51},{"Month":"Feb 26","Date":"2026-02-09","DE":9,"DE / QC":4,"Intake":5,"LSMV/LSIT":4,"Mailbox":3,"Monitoring":3,"MR":9,"Navax":8,"QC":6,"Total ":51},{"Month":"Feb 26","Date":"2026-02-10","DE":9,"DE / QC":4,"Intake":5,"LSMV/LSIT":4,"Mailbox":3,"Monitoring":3,"MR":9,"Navax":8,"QC":6,"Total ":51},{"Month":"Feb 26","Date":"2026-02-11","DE":9,"DE / QC":4,"Intake":5,"LSMV/LSIT":4,"Mailbox":3,"Monitoring":3,"MR":9,"Navax":8,"QC":6,"Total ":51},{"Month":"Feb 26","Date":"2026-02-12","DE":9,"DE / QC":4,"Intake":5,"LSMV/LSIT":4,"Mailbox":3,"Monitoring":3,"MR":9,"Navax":8,"QC":6,"Total ":51},{"Month":"Feb 26","Date":"2026-02-13","DE":9,"DE / QC":4,"Intake":5,"LSMV/LSIT":4,"Mailbox":3,"Monitoring":3,"MR":9,"Navax":8,"QC":6,"Total ":51},{"Month":"Feb 26","Date":"2026-02-16","DE":9,"DE / QC":4,"Intake":5,"LSMV/LSIT":4,"Mailbox":3,"Monitoring":3,"MR":9,"Navax":8,"QC":6,"Total ":51},{"Month":"Feb 26","Date":"2026-02-17","DE":9,"DE / QC":4,"Intake":5,"LSMV/LSIT":4,"Mailbox":3,"Monitoring":3,"MR":9,"Navax":8,"QC":6,"Total ":51},{"Month":"Feb 26","Date":"2026-02-18","DE":9,"DE / QC":4,"Intake":5,"LSMV/LSIT":4,"Mailbox":3,"Monitoring":3,"MR":9,"Navax":8,"QC":6,"Total ":51},{"Month":"Feb 26","Date":"2026-02-19","DE":9,"DE / QC":4,"Intake":5,"LSMV/LSIT":4,"Mailbox":3,"Monitoring":3,"MR":9,"Navax":8,"QC":6,"Total ":51},{"Month":"Feb 26","Date":"2026-02-20","DE":9,"DE / QC":4,"Intake":5,"LSMV/LSIT":4,"Mailbox":3,"Monitoring":3,"MR":9,"Navax":8,"QC":6,"Total ":51},{"Month":"Feb 26","Date":"2026-02-23","DE":9,"DE / QC":4,"Intake":5,"LSMV/LSIT":4,"Mailbox":3,"Monitoring":3,"MR":9,"Navax":8,"QC":6,"Total ":51},{"Month":"Feb 26","Date":"2026-02-24","DE":9,"DE / QC":4,"Intake":5,"LSMV/LSIT":4,"Mailbox":3,"Monitoring":3,"MR":9,"Navax":8,"QC":6,"Total ":51},{"Month":"Feb 26","Date":"2026-02-25","DE":9,"DE / QC":4,"Intake":5,"LSMV/LSIT":4,"Mailbox":3,"Monitoring":3,"MR":9,"Navax":8,"QC":6,"Total ":51},{"Month":"Feb 26","Date":"2026-02-26","DE":9,"DE / QC":4,"Intake":5,"LSMV/LSIT":4,"Mailbox":3,"Monitoring":3,"MR":9,"Navax":8,"QC":6,"Total ":51},{"Month":"Feb 26","Date":"2026-02-27","DE":9,"DE / QC":4,"Intake":5,"LSMV/LSIT":4,"Mailbox":3,"Monitoring":3,"MR":9,"Navax":8,"QC":6,"Total ":51},{"Month":"Mar 26","Date":"2026-03-02","DE":9,"DE / QC":4,"Intake":5,"LSMV/LSIT":4,"Mailbox":3,"Monitoring":3,"MR":9,"Navax":8,"QC":6,"Total ":51},{"Month":"Mar 26","Date":"2026-03-03","DE":9,"DE / QC":4,"Intake":5,"LSMV/LSIT":4,"Mailbox":3,"Monitoring":3,"MR":9,"Navax":8,"QC":6,"Total ":51},{"Month":"Mar 26","Date":"2026-03-04","DE":9,"DE / QC":4,"Intake":5,"LSMV/LSIT":4,"Mailbox":3,"Monitoring":3,"MR":9,"Navax":8,"QC":6,"Total ":51},{"Month":"Mar 26","Date":"2026-03-05","DE":9,"DE / QC":4,"Intake":5,"LSMV/LSIT":4,"Mailbox":3,"Monitoring":3,"MR":9,"Navax":8,"QC":6,"Total ":51},{"Month":"Mar 26","Date":"2026-03-06","DE":9,"DE / QC":4,"Intake":5,"LSMV/LSIT":4,"Mailbox":3,"Monitoring":3,"MR":9,"Navax":8,"QC":6,"Total ":51},{"Month":"Mar 26","Date":"2026-03-09","DE":9,"DE / QC":4,"Intake":5,"LSMV/LSIT":4,"Mailbox":3,"Monitoring":3,"MR":9,"Navax":8,"QC":6,"Total ":51},{"Month":"Mar 26","Date":"2026-03-10","DE":9,"DE / QC":4,"Intake":5,"LSMV/LSIT":4,"Mailbox":3,"Monitoring":3,"MR":9,"Navax":8,"QC":6,"Total ":51},{"Month":"Mar 26","Date":"2026-03-11","DE":9,"DE / QC":4,"Intake":5,"LSMV/LSIT":4,"Mailbox":3,"Monitoring":3,"MR":9,"Navax":8,"QC":6,"Total ":51},{"Month":"Mar 26","Date":"2026-03-12","DE":9,"DE / QC":4,"Intake":5,"LSMV/LSIT":4,"Mailbox":3,"Monitoring":3,"MR":9,"Navax":8,"QC":6,"Total ":51},{"Month":"Mar 26","Date":"2026-03-13","DE":9,"DE / QC":4,"Intake":5,"LSMV/LSIT":4,"Mailbox":3,"Monitoring":3,"MR":9,"Navax":8,"QC":6,"Total ":51},{"Month":"Mar 26","Date":"2026-03-16","DE":9,"DE / QC":4,"Intake":5,"LSMV/LSIT":4,"Mailbox":3,"Monitoring":3,"MR":9,"Navax":8,"QC":6,"Total ":51},{"Month":"Mar 26","Date":"2026-03-17","DE":9,"DE / QC":4,"Intake":5,"LSMV/LSIT":4,"Mailbox":3,"Monitoring":3,"MR":9,"Navax":8,"QC":6,"Total ":51},{"Month":"Mar 26","Date":"2026-03-18","DE":9,"DE / QC":4,"Intake":5,"LSMV/LSIT":4,"Mailbox":3,"Monitoring":3,"MR":9,"Navax":8,"QC":6,"Total ":51},{"Month":"Mar 26","Date":"2026-03-19","DE":9,"DE / QC":4,"Intake":5,"LSMV/LSIT":4,"Mailbox":3,"Monitoring":3,"MR":9,"Navax":8,"QC":6,"Total ":51},{"Month":"Mar 26","Date":"2026-03-20","DE":9,"DE / QC":4,"Intake":5,"LSMV/LSIT":4,"Mailbox":3,"Monitoring":3,"MR":9,"Navax":8,"QC":6,"Total ":51},{"Month":"Mar 26","Date":"2026-03-23","DE":9,"DE / QC":4,"Intake":5,"LSMV/LSIT":4,"Mailbox":3,"Monitoring":3,"MR":9,"Navax":8,"QC":6,"Total ":51},{"Month":"Mar 26","Date":"2026-03-24","DE":9,"DE / QC":4,"Intake":5,"LSMV/LSIT":4,"Mailbox":3,"Monitoring":3,"MR":9,"Navax":8,"QC":6,"Total ":51},{"Month":"Mar 26","Date":"2026-03-25","DE":9,"DE / QC":4,"Intake":5,"LSMV/LSIT":4,"Mailbox":3,"Monitoring":3,"MR":9,"Navax":8,"QC":6,"Total ":51},{"Month":"Mar 26","Date":"2026-03-26","DE":9,"DE / QC":4,"Intake":5,"LSMV/LSIT":4,"Mailbox":3,"Monitoring":3,"MR":9,"Navax":8,"QC":6,"Total ":51},{"Month":"Mar 26","Date":"2026-03-27","DE":9,"DE / QC":4,"Intake":5,"LSMV/LSIT":4,"Mailbox":3,"Monitoring":3,"MR":9,"Navax":8,"QC":6,"Total ":51},{"Month":"Mar 26","Date":"2026-03-30","DE":9,"DE / QC":4,"Intake":5,"LSMV/LSIT":4,"Mailbox":3,"Monitoring":3,"MR":9,"Navax":8,"QC":6,"Total ":51},{"Month":"Mar 26","Date":"2026-03-31","DE":9,"DE / QC":4,"Intake":5,"LSMV/LSIT":4,"Mailbox":3,"Monitoring":3,"MR":9,"Navax":8,"QC":6,"Total ":51}],"Inline Quality":[{"Date": "2026-01-01", "Samples": 57, "Total UBA": 10, "Critical DPU": 2, "Major DPU": 8, "Minor DPU": 1, "Total Critical Errors": 3, "Total Major Errors": 11, "Total Minor Errors": 1, "Overall Errors": 15}, {"Date": "2026-01-02", "Samples": 69, "Total UBA": 8, "Critical DPU": 3, "Major DPU": 6, "Minor DPU": 2, "Total Critical Errors": 3, "Total Major Errors": 9, "Total Minor Errors": 3, "Overall Errors": 15}, {"Date": "2026-01-05", "Samples": 77, "Total UBA": 5, "Critical DPU": 0, "Major DPU": 5, "Minor DPU": 1, "Total Critical Errors": 0, "Total Major Errors": 7, "Total Minor Errors": 1, "Overall Errors": 8}, {"Date": "2026-01-06", "Samples": 77, "Total UBA": 10, "Critical DPU": 2, "Major DPU": 8, "Minor DPU": 1, "Total Critical Errors": 3, "Total Major Errors": 10, "Total Minor Errors": 1, "Overall Errors": 14}, {"Date": "2026-01-07", "Samples": 64, "Total UBA": 5, "Critical DPU": 1, "Major DPU": 3, "Minor DPU": 2, "Total Critical Errors": 1, "Total Major Errors": 3, "Total Minor Errors": 2, "Overall Errors": 6}, {"Date": "2026-01-08", "Samples": 88, "Total UBA": 2, "Critical DPU": 0, "Major DPU": 2, "Minor DPU": 0, "Total Critical Errors": 0, "Total Major Errors": 3, "Total Minor Errors": 0, "Overall Errors": 3}, {"Date": "2026-01-09", "Samples": 68, "Total UBA": 7, "Critical DPU": 1, "Major DPU": 6, "Minor DPU": 0, "Total Critical Errors": 1, "Total Major Errors": 7, "Total Minor Errors": 0, "Overall Errors": 8}, {"Date": "2026-01-10", "Samples": 14, "Total UBA": 1, "Critical DPU": 0, "Major DPU": 1, "Minor DPU": 0, "Total Critical Errors": 0, "Total Major Errors": 1, "Total Minor Errors": 0, "Overall Errors": 1}, {"Date": "2026-01-12", "Samples": 59, "Total UBA": 3, "Critical DPU": 1, "Major DPU": 2, "Minor DPU": 0, "Total Critical Errors": 1, "Total Major Errors": 2, "Total Minor Errors": 0, "Overall Errors": 3}, {"Date": "2026-01-13", "Samples": 99, "Total UBA": 2, "Critical DPU": 1, "Major DPU": 1, "Minor DPU": 0, "Total Critical Errors": 1, "Total Major Errors": 1, "Total Minor Errors": 0, "Overall Errors": 2}, {"Date": "2026-01-14", "Samples": 83, "Total UBA": 3, "Critical DPU": 0, "Major DPU": 3, "Minor DPU": 0, "Total Critical Errors": 0, "Total Major Errors": 3, "Total Minor Errors": 0, "Overall Errors": 3}, {"Date": "2026-01-15", "Samples": 63, "Total UBA": 4, "Critical DPU": 0, "Major DPU": 4, "Minor DPU": 0, "Total Critical Errors": 0, "Total Major Errors": 7, "Total Minor Errors": 0, "Overall Errors": 7}, {"Date": "2026-01-16", "Samples": 74, "Total UBA": 2, "Critical DPU": 0, "Major DPU": 2, "Minor DPU": 0, "Total Critical Errors": 0, "Total Major Errors": 2, "Total Minor Errors": 0, "Overall Errors": 2}, {"Date": "2026-01-19", "Samples": 62, "Total UBA": 2, "Critical DPU": 1, "Major DPU": 0, "Minor DPU": 1, "Total Critical Errors": 1, "Total Major Errors": 0, "Total Minor Errors": 1, "Overall Errors": 2}, {"Date": "2026-01-20", "Samples": 86, "Total UBA": 10, "Critical DPU": 5, "Major DPU": 4, "Minor DPU": 1, "Total Critical Errors": 8, "Total Major Errors": 5, "Total Minor Errors": 1, "Overall Errors": 14}, {"Date": "2026-01-21", "Samples": 51, "Total UBA": 7, "Critical DPU": 5, "Major DPU": 2, "Minor DPU": 0, "Total Critical Errors": 6, "Total Major Errors": 2, "Total Minor Errors": 0, "Overall Errors": 8}, {"Date": "2026-01-22", "Samples": 97, "Total UBA": 7, "Critical DPU": 1, "Major DPU": 6, "Minor DPU": 0, "Total Critical Errors": 1, "Total Major Errors": 6, "Total Minor Errors": 0, "Overall Errors": 7}, {"Date": "2026-01-23", "Samples": 86, "Total UBA": 4, "Critical DPU": 1, "Major DPU": 3, "Minor DPU": 0, "Total Critical Errors": 1, "Total Major Errors": 5, "Total Minor Errors": 0, "Overall Errors": 6}, {"Date": "2026-01-26", "Samples": 51, "Total UBA": 4, "Critical DPU": 1, "Major DPU": 4, "Minor DPU": 0, "Total Critical Errors": 1, "Total Major Errors": 5, "Total Minor Errors": 0, "Overall Errors": 6}, {"Date": "2026-01-27", "Samples": 109, "Total UBA": 7, "Critical DPU": 4, "Major DPU": 3, "Minor DPU": 1, "Total Critical Errors": 4, "Total Major Errors": 3, "Total Minor Errors": 1, "Overall Errors": 8}, {"Date": "2026-01-28", "Samples": 52, "Total UBA": 1, "Critical DPU": 1, "Major DPU": 0, "Minor DPU": 0, "Total Critical Errors": 1, "Total Major Errors": 0, "Total Minor Errors": 0, "Overall Errors": 1}, {"Date": "2026-01-29", "Samples": 96, "Total UBA": 2, "Critical DPU": 1, "Major DPU": 2, "Minor DPU": 0, "Total Critical Errors": 1, "Total Major Errors": 2, "Total Minor Errors": 0, "Overall Errors": 3}, {"Date": "2026-01-30", "Samples": 88, "Total UBA": 7, "Critical DPU": 1, "Major DPU": 6, "Minor DPU": 1, "Total Critical Errors": 1, "Total Major Errors": 7, "Total Minor Errors": 1, "Overall Errors": 9}, {"Date": "2026-01-31", "Samples": 12, "Total UBA": 1, "Critical DPU": 0, "Major DPU": 0, "Minor DPU": 1, "Total Critical Errors": 0, "Total Major Errors": 0, "Total Minor Errors": 1, "Overall Errors": 1}, {"Date": "2026-02-02", "Samples": 70, "Total UBA": 4, "Critical DPU": 2, "Major DPU": 2, "Minor DPU": 0, "Total Critical Errors": 2, "Total Major Errors": 2, "Total Minor Errors": 0, "Overall Errors": 4}, {"Date": "2026-02-03", "Samples": 64, "Total UBA": 10, "Critical DPU": 2, "Major DPU": 8, "Minor DPU": 1, "Total Critical Errors": 2, "Total Major Errors": 15, "Total Minor Errors": 1, "Overall Errors": 18}, {"Date": "2026-02-04", "Samples": 69, "Total UBA": 6, "Critical DPU": 1, "Major DPU": 4, "Minor DPU": 1, "Total Critical Errors": 1, "Total Major Errors": 4, "Total Minor Errors": 1, "Overall Errors": 6}, {"Date": "2026-02-05", "Samples": 60, "Total UBA": 5, "Critical DPU": 0, "Major DPU": 5, "Minor DPU": 0, "Total Critical Errors": 0, "Total Major Errors": 7, "Total Minor Errors": 0, "Overall Errors": 7}, {"Date": "2026-02-06", "Samples": 68, "Total UBA": 3, "Critical DPU": 1, "Major DPU": 2, "Minor DPU": 0, "Total Critical Errors": 1, "Total Major Errors": 3, "Total Minor Errors": 0, "Overall Errors": 4}, {"Date": "2026-02-07", "Samples": 6, "Total UBA": 0, "Critical DPU": 0, "Major DPU": 0, "Minor DPU": 0, "Total Critical Errors": 0, "Total Major Errors": 0, "Total Minor Errors": 0, "Overall Errors": 0}, {"Date": "2026-02-09", "Samples": 67, "Total UBA": 3, "Critical DPU": 1, "Major DPU": 2, "Minor DPU": 0, "Total Critical Errors": 1, "Total Major Errors": 2, "Total Minor Errors": 0, "Overall Errors": 3}, {"Date": "2026-02-10", "Samples": 73, "Total UBA": 4, "Critical DPU": 0, "Major DPU": 4, "Minor DPU": 1, "Total Critical Errors": 0, "Total Major Errors": 4, "Total Minor Errors": 1, "Overall Errors": 5}, {"Date": "2026-02-11", "Samples": 57, "Total UBA": 5, "Critical DPU": 2, "Major DPU": 4, "Minor DPU": 0, "Total Critical Errors": 2, "Total Major Errors": 6, "Total Minor Errors": 0, "Overall Errors": 8}, {"Date": "2026-02-12", "Samples": 93, "Total UBA": 6, "Critical DPU": 1, "Major DPU": 5, "Minor DPU": 1, "Total Critical Errors": 1, "Total Major Errors": 7, "Total Minor Errors": 1, "Overall Errors": 9}, {"Date": "2026-02-13", "Samples": 58, "Total UBA": 8, "Critical DPU": 4, "Major DPU": 4, "Minor DPU": 0, "Total Critical Errors": 4, "Total Major Errors": 4, "Total Minor Errors": 0, "Overall Errors": 8}, {"Date": "2026-02-16", "Samples": 104, "Total UBA": 7, "Critical DPU": 3, "Major DPU": 4, "Minor DPU": 1, "Total Critical Errors": 3, "Total Major Errors": 4, "Total Minor Errors": 1, "Overall Errors": 8}, {"Date": "2026-02-17", "Samples": 67, "Total UBA": 3, "Critical DPU": 0, "Major DPU": 3, "Minor DPU": 0, "Total Critical Errors": 0, "Total Major Errors": 3, "Total Minor Errors": 0, "Overall Errors": 3}, {"Date": "2026-02-18", "Samples": 56, "Total UBA": 10, "Critical DPU": 3, "Major DPU": 6, "Minor DPU": 1, "Total Critical Errors": 3, "Total Major Errors": 6, "Total Minor Errors": 1, "Overall Errors": 10}, {"Date": "2026-02-19", "Samples": 73, "Total UBA": 3, "Critical DPU": 0, "Major DPU": 3, "Minor DPU": 0, "Total Critical Errors": 0, "Total Major Errors": 3, "Total Minor Errors": 0, "Overall Errors": 3}, {"Date": "2026-02-20", "Samples": 44, "Total UBA": 4, "Critical DPU": 1, "Major DPU": 3, "Minor DPU": 2, "Total Critical Errors": 2, "Total Major Errors": 4, "Total Minor Errors": 2, "Overall Errors": 8}, {"Date": "2026-02-23", "Samples": 58, "Total UBA": 2, "Critical DPU": 0, "Major DPU": 2, "Minor DPU": 0, "Total Critical Errors": 0, "Total Major Errors": 2, "Total Minor Errors": 0, "Overall Errors": 2}, {"Date": "2026-02-24", "Samples": 55, "Total UBA": 1, "Critical DPU": 0, "Major DPU": 1, "Minor DPU": 0, "Total Critical Errors": 0, "Total Major Errors": 1, "Total Minor Errors": 0, "Overall Errors": 1}, {"Date": "2026-02-25", "Samples": 85, "Total UBA": 6, "Critical DPU": 4, "Major DPU": 4, "Minor DPU": 1, "Total Critical Errors": 4, "Total Major Errors": 6, "Total Minor Errors": 1, "Overall Errors": 11}, {"Date": "2026-02-26", "Samples": 57, "Total UBA": 3, "Critical DPU": 1, "Major DPU": 3, "Minor DPU": 0, "Total Critical Errors": 1, "Total Major Errors": 3, "Total Minor Errors": 0, "Overall Errors": 4}, {"Date": "2026-02-27", "Samples": 55, "Total UBA": 5, "Critical DPU": 2, "Major DPU": 3, "Minor DPU": 2, "Total Critical Errors": 2, "Total Major Errors": 4, "Total Minor Errors": 2, "Overall Errors": 8}, {"Date": "2026-02-28", "Samples": 32, "Total UBA": 7, "Critical DPU": 2, "Major DPU": 6, "Minor DPU": 0, "Total Critical Errors": 2, "Total Major Errors": 10, "Total Minor Errors": 0, "Overall Errors": 12}, {"Date": "2026-03-01", "Samples": 9, "Total UBA": 0, "Critical DPU": 0, "Major DPU": 0, "Minor DPU": 0, "Total Critical Errors": 0, "Total Major Errors": 0, "Total Minor Errors": 0, "Overall Errors": 0}, {"Date": "2026-03-02", "Samples": 43, "Total UBA": 1, "Critical DPU": 0, "Major DPU": 1, "Minor DPU": 0, "Total Critical Errors": 0, "Total Major Errors": 1, "Total Minor Errors": 0, "Overall Errors": 1}, {"Date": "2026-03-03", "Samples": 58, "Total UBA": 7, "Critical DPU": 2, "Major DPU": 6, "Minor DPU": 2, "Total Critical Errors": 2, "Total Major Errors": 7, "Total Minor Errors": 2, "Overall Errors": 11}, {"Date": "2026-03-04", "Samples": 74, "Total UBA": 6, "Critical DPU": 1, "Major DPU": 6, "Minor DPU": 0, "Total Critical Errors": 1, "Total Major Errors": 9, "Total Minor Errors": 0, "Overall Errors": 10}, {"Date": "2026-03-05", "Samples": 70, "Total UBA": 4, "Critical DPU": 1, "Major DPU": 3, "Minor DPU": 0, "Total Critical Errors": 1, "Total Major Errors": 3, "Total Minor Errors": 0, "Overall Errors": 4}, {"Date": "2026-03-06", "Samples": 49, "Total UBA": 5, "Critical DPU": 2, "Major DPU": 3, "Minor DPU": 0, "Total Critical Errors": 2, "Total Major Errors": 6, "Total Minor Errors": 0, "Overall Errors": 8}, {"Date": "2026-03-07", "Samples": 34, "Total UBA": 1, "Critical DPU": 0, "Major DPU": 1, "Minor DPU": 0, "Total Critical Errors": 0, "Total Major Errors": 1, "Total Minor Errors": 0, "Overall Errors": 1}, {"Date": "2026-03-09", "Samples": 72, "Total UBA": 4, "Critical DPU": 0, "Major DPU": 4, "Minor DPU": 0, "Total Critical Errors": 0, "Total Major Errors": 5, "Total Minor Errors": 0, "Overall Errors": 5}, {"Date": "2026-03-10", "Samples": 83, "Total UBA": 3, "Critical DPU": 2, "Major DPU": 0, "Minor DPU": 1, "Total Critical Errors": 2, "Total Major Errors": 0, "Total Minor Errors": 3, "Overall Errors": 5}, {"Date": "2026-03-11", "Samples": 77, "Total UBA": 5, "Critical DPU": 1, "Major DPU": 4, "Minor DPU": 1, "Total Critical Errors": 1, "Total Major Errors": 4, "Total Minor Errors": 1, "Overall Errors": 6}, {"Date": "2026-03-12", "Samples": 72, "Total UBA": 3, "Critical DPU": 2, "Major DPU": 3, "Minor DPU": 0, "Total Critical Errors": 2, "Total Major Errors": 5, "Total Minor Errors": 0, "Overall Errors": 7}, {"Date": "2026-03-13", "Samples": 48, "Total UBA": 1, "Critical DPU": 1, "Major DPU": 1, "Minor DPU": 0, "Total Critical Errors": 1, "Total Major Errors": 3, "Total Minor Errors": 0, "Overall Errors": 4}, {"Date": "2026-03-14", "Samples": 42, "Total UBA": 4, "Critical DPU": 0, "Major DPU": 4, "Minor DPU": 0, "Total Critical Errors": 0, "Total Major Errors": 8, "Total Minor Errors": 0, "Overall Errors": 8}, {"Date": "2026-03-15", "Samples": 21, "Total UBA": 0, "Critical DPU": 0, "Major DPU": 0, "Minor DPU": 0, "Total Critical Errors": 0, "Total Major Errors": 0, "Total Minor Errors": 0, "Overall Errors": 0}, {"Date": "2026-03-16", "Samples": 49, "Total UBA": 3, "Critical DPU": 2, "Major DPU": 1, "Minor DPU": 0, "Total Critical Errors": 2, "Total Major Errors": 1, "Total Minor Errors": 0, "Overall Errors": 3}, {"Date": "2026-03-17", "Samples": 86, "Total UBA": 3, "Critical DPU": 0, "Major DPU": 3, "Minor DPU": 1, "Total Critical Errors": 0, "Total Major Errors": 4, "Total Minor Errors": 1, "Overall Errors": 5}, {"Date": "2026-03-18", "Samples": 69, "Total UBA": 2, "Critical DPU": 1, "Major DPU": 1, "Minor DPU": 0, "Total Critical Errors": 1, "Total Major Errors": 1, "Total Minor Errors": 0, "Overall Errors": 2}, {"Date": "2026-03-19", "Samples": 57, "Total UBA": 2, "Critical DPU": 0, "Major DPU": 2, "Minor DPU": 0, "Total Critical Errors": 0, "Total Major Errors": 2, "Total Minor Errors": 0, "Overall Errors": 2}, {"Date": "2026-03-20", "Samples": 22, "Total UBA": 1, "Critical DPU": 0, "Major DPU": 1, "Minor DPU": 0, "Total Critical Errors": 0, "Total Major Errors": 1, "Total Minor Errors": 0, "Overall Errors": 1}, {"Date": "2026-03-21", "Samples": 24, "Total UBA": 3, "Critical DPU": 1, "Major DPU": 2, "Minor DPU": 0, "Total Critical Errors": 1, "Total Major Errors": 3, "Total Minor Errors": 0, "Overall Errors": 4}, {"Date": "2026-03-22", "Samples": 12, "Total UBA": 0, "Critical DPU": 0, "Major DPU": 0, "Minor DPU": 0, "Total Critical Errors": 0, "Total Major Errors": 0, "Total Minor Errors": 0, "Overall Errors": 0}, {"Date": "2026-03-23", "Samples": 91, "Total UBA": 5, "Critical DPU": 1, "Major DPU": 5, "Minor DPU": 0, "Total Critical Errors": 1, "Total Major Errors": 7, "Total Minor Errors": 0, "Overall Errors": 8}, {"Date": "2026-03-24", "Samples": 76, "Total UBA": 5, "Critical DPU": 1, "Major DPU": 4, "Minor DPU": 0, "Total Critical Errors": 1, "Total Major Errors": 6, "Total Minor Errors": 0, "Overall Errors": 7}, {"Date": "2026-03-25", "Samples": 94, "Total UBA": 11, "Critical DPU": 2, "Major DPU": 8, "Minor DPU": 3, "Total Critical Errors": 2, "Total Major Errors": 9, "Total Minor Errors": 3, "Overall Errors": 14}, {"Date": "2026-03-26", "Samples": 79, "Total UBA": 2, "Critical DPU": 0, "Major DPU": 1, "Minor DPU": 1, "Total Critical Errors": 0, "Total Major Errors": 1, "Total Minor Errors": 1, "Overall Errors": 2}, {"Date": "2026-03-27", "Samples": 55, "Total UBA": 6, "Critical DPU": 3, "Major DPU": 4, "Minor DPU": 0, "Total Critical Errors": 4, "Total Major Errors": 4, "Total Minor Errors": 0, "Overall Errors": 8}, {"Date": "2026-03-28", "Samples": 38, "Total UBA": 1, "Critical DPU": 0, "Major DPU": 1, "Minor DPU": 0, "Total Critical Errors": 0, "Total Major Errors": 1, "Total Minor Errors": 0, "Overall Errors": 1}, {"Date": "2026-03-30", "Samples": 78, "Total UBA": 10, "Critical DPU": 1, "Major DPU": 8, "Minor DPU": 2, "Total Critical Errors": 1, "Total Major Errors": 9, "Total Minor Errors": 3, "Overall Errors": 13}, {"Date": "2026-03-31", "Samples": 58, "Total UBA": 3, "Critical DPU": 0, "Major DPU": 2, "Minor DPU": 1, "Total Critical Errors": 0, "Total Major Errors": 4, "Total Minor Errors": 1, "Overall Errors": 5}],"External Quality":[{"Date": "2026-01-01", "Samples": 27, "Critical Unit": 0, "Major Unit": null, "Total Error": 0}, {"Date": "2026-01-02", "Samples": 24, "Critical Unit": 0, "Major Unit": null, "Total Error": 0}, {"Date": "2026-01-05", "Samples": 28, "Critical Unit": 0, "Major Unit": null, "Total Error": 0}, {"Date": "2026-01-06", "Samples": 29, "Critical Unit": 0, "Major Unit": null, "Total Error": 0}, {"Date": "2026-01-07", "Samples": 29, "Critical Unit": 1, "Major Unit": null, "Total Error": 1}, {"Date": "2026-01-08", "Samples": 31, "Critical Unit": 0, "Major Unit": 1.0, "Total Error": 1}, {"Date": "2026-01-09", "Samples": 31, "Critical Unit": 0, "Major Unit": 1.0, "Total Error": 1}, {"Date": "2026-01-12", "Samples": 30, "Critical Unit": 0, "Major Unit": 1.0, "Total Error": 1}, {"Date": "2026-01-13", "Samples": 27, "Critical Unit": 0, "Major Unit": null, "Total Error": 0}, {"Date": "2026-01-14", "Samples": 30, "Critical Unit": 0, "Major Unit": null, "Total Error": 0}, {"Date": "2026-01-15", "Samples": 30, "Critical Unit": 0, "Major Unit": null, "Total Error": 0}, {"Date": "2026-01-16", "Samples": 24, "Critical Unit": 0, "Major Unit": null, "Total Error": 0}, {"Date": "2026-01-19", "Samples": 30, "Critical Unit": 0, "Major Unit": null, "Total Error": 0}, {"Date": "2026-01-20", "Samples": 26, "Critical Unit": 0, "Major Unit": 1.0, "Total Error": 1}, {"Date": "2026-01-21", "Samples": 25, "Critical Unit": 0, "Major Unit": null, "Total Error": 0}, {"Date": "2026-01-22", "Samples": 27, "Critical Unit": 1, "Major Unit": null, "Total Error": 1}, {"Date": "2026-01-23", "Samples": 29, "Critical Unit": 0, "Major Unit": 1.0, "Total Error": 1}, {"Date": "2026-01-26", "Samples": 29, "Critical Unit": 0, "Major Unit": 2.0, "Total Error": 2}, {"Date": "2026-01-27", "Samples": 23, "Critical Unit": 0, "Major Unit": 1.0, "Total Error": 1}, {"Date": "2026-01-28", "Samples": 31, "Critical Unit": 0, "Major Unit": 1.0, "Total Error": 1}, {"Date": "2026-01-29", "Samples": 29, "Critical Unit": 0, "Major Unit": 1.0, "Total Error": 1}, {"Date": "2026-01-30", "Samples": 28, "Critical Unit": 0, "Major Unit": null, "Total Error": 0}, {"Date": "2026-02-02", "Samples": 31, "Critical Unit": 0, "Major Unit": null, "Total Error": 0}, {"Date": "2026-02-03", "Samples": 28, "Critical Unit": 0, "Major Unit": 1.0, "Total Error": 1}, {"Date": "2026-02-04", "Samples": 28, "Critical Unit": 1, "Major Unit": null, "Total Error": 1}, {"Date": "2026-02-05", "Samples": 28, "Critical Unit": 0, "Major Unit": 1.0, "Total Error": 1}, {"Date": "2026-02-06", "Samples": 32, "Critical Unit": 0, "Major Unit": 2.0, "Total Error": 2}, {"Date": "2026-02-09", "Samples": 27, "Critical Unit": 1, "Major Unit": 2.0, "Total Error": 3}, {"Date": "2026-02-10", "Samples": 28, "Critical Unit": 0, "Major Unit": 2.0, "Total Error": 2}, {"Date": "2026-02-11", "Samples": 29, "Critical Unit": 0, "Major Unit": null, "Total Error": 0}, {"Date": "2026-02-12", "Samples": 25, "Critical Unit": 1, "Major Unit": 2.0, "Total Error": 3}, {"Date": "2026-02-13", "Samples": 29, "Critical Unit": 1, "Major Unit": null, "Total Error": 1}, {"Date": "2026-02-16", "Samples": 28, "Critical Unit": 0, "Major Unit": 1.0, "Total Error": 1}, {"Date": "2026-02-17", "Samples": 29, "Critical Unit": 0, "Major Unit": 1.0, "Total Error": 1}, {"Date": "2026-02-18", "Samples": 30, "Critical Unit": 0, "Major Unit": null, "Total Error": 0}, {"Date": "2026-02-19", "Samples": 29, "Critical Unit": 0, "Major Unit": null, "Total Error": 0}, {"Date": "2026-02-20", "Samples": 30, "Critical Unit": 0, "Major Unit": null, "Total Error": 0}, {"Date": "2026-02-23", "Samples": 29, "Critical Unit": 1, "Major Unit": 3.0, "Total Error": 4}, {"Date": "2026-02-24", "Samples": 31, "Critical Unit": 0, "Major Unit": 1.0, "Total Error": 1}, {"Date": "2026-02-25", "Samples": 25, "Critical Unit": 0, "Major Unit": null, "Total Error": 0}, {"Date": "2026-02-26", "Samples": 31, "Critical Unit": 2, "Major Unit": null, "Total Error": 2}, {"Date": "2026-02-27", "Samples": 29, "Critical Unit": 0, "Major Unit": null, "Total Error": 0}, {"Date": "2026-03-02", "Samples": 29, "Critical Unit": 1, "Major Unit": 1.0, "Total Error": 2}, {"Date": "2026-03-03", "Samples": 30, "Critical Unit": 0, "Major Unit": 5.0, "Total Error": 5}, {"Date": "2026-03-04", "Samples": 29, "Critical Unit": 0, "Major Unit": null, "Total Error": 0}, {"Date": "2026-03-05", "Samples": 31, "Critical Unit": 0, "Major Unit": null, "Total Error": 0}, {"Date": "2026-03-06", "Samples": 29, "Critical Unit": 1, "Major Unit": 2.0, "Total Error": 3}, {"Date": "2026-03-09", "Samples": 34, "Critical Unit": 0, "Major Unit": 2.0, "Total Error": 2}, {"Date": "2026-03-10", "Samples": 33, "Critical Unit": 0, "Major Unit": 2.0, "Total Error": 2}, {"Date": "2026-03-11", "Samples": 33, "Critical Unit": 0, "Major Unit": null, "Total Error": 0}, {"Date": "2026-03-12", "Samples": 24, "Critical Unit": 0, "Major Unit": null, "Total Error": 0}, {"Date": "2026-03-13", "Samples": 31, "Critical Unit": 1, "Major Unit": null, "Total Error": 1}, {"Date": "2026-03-16", "Samples": 37, "Critical Unit": 1, "Major Unit": 2.0, "Total Error": 3}, {"Date": "2026-03-17", "Samples": 30, "Critical Unit": 0, "Major Unit": 1.0, "Total Error": 1}, {"Date": "2026-03-18", "Samples": 31, "Critical Unit": 1, "Major Unit": 1.0, "Total Error": 2}, {"Date": "2026-03-19", "Samples": 32, "Critical Unit": 0, "Major Unit": null, "Total Error": 0}, {"Date": "2026-03-20", "Samples": 25, "Critical Unit": 1, "Major Unit": 1.0, "Total Error": 2}, {"Date": "2026-03-23", "Samples": 23, "Critical Unit": 0, "Major Unit": null, "Total Error": 0}, {"Date": "2026-03-24", "Samples": 30, "Critical Unit": 0, "Major Unit": 1.0, "Total Error": 1}, {"Date": "2026-03-25", "Samples": 29, "Critical Unit": 1, "Major Unit": 2.0, "Total Error": 3}, {"Date": "2026-03-26", "Samples": 32, "Critical Unit": 0, "Major Unit": 1.0, "Total Error": 1}, {"Date": "2026-03-27", "Samples": 28, "Critical Unit": 0, "Major Unit": 1.0, "Total Error": 1}, {"Date": "2026-03-30", "Samples": 32, "Critical Unit": 0, "Major Unit": null, "Total Error": 0}, {"Date": "2026-03-31", "Samples": 31, "Critical Unit": 0, "Major Unit": null, "Total Error": 0}]};
+
+// Register datalabels plugin globally
+Chart.register(ChartDataLabels);
+
+// ═══════════════════════════════
+// STATE
+// ═══════════════════════════════
+let rawData = JSON.parse(JSON.stringify(SAMPLE_DATA));
+let filteredData = {};
+let activeMonths = new Set();
+let allMonths = [];
+let currentView = 'monthly';
+let chartInstances = {};
+
+const TEAMS = ['DE', 'DE / QC', 'Intake', 'LSMV/LSIT', 'Mailbox', 'Monitoring', 'MR', 'Navax', 'QC'];
+const TEAM_COLORS = ['#1d6ff2','#0d9488','#7c3aed','#d97706','#dc2626','#059669','#0891b2','#9333ea','#ea580c'];
+const BACKLOG_THRESHOLD = 500;
+const TARGET = 110;
+
+// ═══════════════════════════════
+// HELPERS
+// ═══════════════════════════════
+function fmt(n) { return n == null ? '—' : Number(n).toLocaleString('en-IN', {maximumFractionDigits:0}); }
+function fmtPct(n) { return n == null ? '—' : n.toFixed(1) + '%'; }
+function isWorkDay(row) {
+  const io = row['Incoming Cases(Actuals)'];
+  return io != null && io > 0;
+}
+function getDate(row) { return row['Date']; }
+
+function destroyChart(id) {
+  if (chartInstances[id]) {
+    chartInstances[id].destroy();
+    delete chartInstances[id];
+  }
+  // Also clear the canvas to prevent ghost rendering from previous instance
+  const canvas = document.getElementById(id);
+  if (canvas) {
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+  }
+}
+
+// ═══════════════════════════════
+// DATA UPDATE
+// Handled automatically by Power Automate
+// Leaders just open the SharePoint link — data is always current
+// ═══════════════════════════════
+let autoRefreshTimer = null;
+function initSharePoint() {}
+function setAutoRefresh() {}
+
+
+
+// ═══════════════════════════════
+// SHARED WORKBOOK PARSER
+// ═══════════════════════════════
+function parseWorkbook(wb) {
+  const sheets = ['Incoming-Outgoing','Absenteeism','Present HC','Total HC','Inline Quality','External Quality'];
+  const loaded  = {};
+
+  function serialToYMD(serial) {
+    if (!serial && serial !== 0) return null;
+    const n = typeof serial === 'number' ? serial : parseFloat(serial);
+    if (isNaN(n)) return null;
+    const totalDays = Math.round(n - 25569);
+    const d   = new Date(totalDays * 86400 * 1000);
+    const yyyy = d.getUTCFullYear();
+    const mm   = String(d.getUTCMonth() + 1).padStart(2, '0');
+    const dd   = String(d.getUTCDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  }
+
+  const MNAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  function dateToMonthLabel(ymd) {
+    if (!ymd || ymd.length < 7) return null;
+    const mo = parseInt(ymd.slice(5, 7)) - 1;
+    const yr = ymd.slice(2, 4);
+    return MNAMES[mo] + ' ' + yr;
+  }
+
+  for (const s of sheets) {
+    if (!wb.SheetNames.includes(s)) { showError(`Missing sheet: "${s}". Check the file.`); return null; }
+    const ws   = wb.Sheets[s];
+    const rows = XLSX.utils.sheet_to_json(ws, { defval: null, raw: true });
+
+    rows.forEach(r => {
+      const rawDate = r['Date'];
+      if (rawDate !== null && rawDate !== undefined) {
+        if (typeof rawDate === 'number') {
+          r['Date'] = serialToYMD(rawDate);
+        } else if (typeof rawDate === 'string' && !rawDate.match(/^\d{4}-\d{2}-\d{2}$/)) {
+          const parsed = new Date(rawDate);
+          if (!isNaN(parsed)) {
+            r['Date'] = `${parsed.getUTCFullYear()}-${String(parsed.getUTCMonth()+1).padStart(2,'0')}-${String(parsed.getUTCDate()).padStart(2,'0')}`;
+          }
+        }
+      }
+      if (r['Date']) r['Month'] = dateToMonthLabel(r['Date']);
+      else           r['Month'] = null;
+    });
+
+    loaded[s] = rows;
+  }
+  return loaded;
+}
+
+// handleFileUpload — managed by Power Automate
+function handleFileUpload(e) {}
+
+function showError(msg) { const el = document.getElementById('error-banner'); el.style.display='block'; el.textContent=msg; }
+function hideError() { document.getElementById('error-banner').style.display='none'; }
+
+// ═══════════════════════════════
+// FILTER STATE & HELPERS
+// ═══════════════════════════════
+let allDates = [];          // sorted array of all YYYY-MM-DD date strings in data
+
+function getISOWeek(d) {
+  // Returns { year, week } ISO week number
+  const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  const day  = date.getUTCDay() || 7;
+  date.setUTCDate(date.getUTCDate() + 4 - day);
+  const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
+  const week = Math.ceil((((date - yearStart) / 86400000) + 1) / 7);
+  return { year: date.getUTCFullYear(), week };
+}
+
+function weekLabel(dateStr) {
+  const d    = new Date(dateStr);
+  const { year, week } = getISOWeek(d);
+  // Find Mon of this ISO week
+  const dayOfWeek = d.getDay() || 7; // Sun=7, Mon=1...Sat=6
+  const mon = new Date(d); mon.setDate(d.getDate() - dayOfWeek + 1);
+  const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
+  const MNAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  // If Mon is in previous year/month, show from the actual data date instead
+  const startDate = mon.getFullYear() < year ? d : mon;
+  const monStr = `${startDate.getDate()} ${MNAMES[startDate.getMonth()]}`;
+  const sunStr = `${sun.getDate()} ${MNAMES[sun.getMonth()]}`;
+  return `W${String(week).padStart(2,'0')} ${year} (${monStr} – ${sunStr})`;
+}
+
+function weekKey(dateStr) {
+  const d = new Date(dateStr);
+  const { year, week } = getISOWeek(d);
+  return `${year}-W${String(week).padStart(2,'0')}`;
+}
+
+function setSelectOptions(id, options, keepAll = true) {
+  const sel = document.getElementById(id);
+  const prev = sel.value;
+  sel.innerHTML = keepAll ? '<option value="">All</option>' : '';
+  options.forEach(({ value, label }) => {
+    const opt = document.createElement('option');
+    opt.value = value; opt.textContent = label;
+    sel.appendChild(opt);
+  });
+  // Only restore previous value if it still exists in the new options
+  // (prevents stale selections causing duplicate chart entries)
+  const stillValid = [...sel.options].some(o => o.value === prev && o.value !== '');
+  sel.value = stillValid ? prev : '';
+}
+
+// ═══════════════════════════════
+// FILTER INIT — called after data load
+// ═══════════════════════════════
+function initFilters() {
+  // Collect working dates ONLY from Incoming-Outgoing sheet
+  // Only include dates that have actual data (non-null Incoming Cases)
+  // This prevents weekends, holidays, and stray dates from polluting filters
+  const dateSet = new Set();
+  const ioSheet = rawData['Incoming-Outgoing'] || [];
+  ioSheet.forEach(r => {
+    const v = r['Incoming Cases(Actuals)'];
+    if (r['Date'] && v !== null && v !== undefined && v > 0) {
+      dateSet.add(r['Date']);
+    }
+  });
+  allDates = [...dateSet].sort();
+
+  // Also keep allMonths for backward compat
+  allMonths = [...new Set(rawData['Incoming-Outgoing'].map(r => r['Month']).filter(Boolean))];
+  activeMonths = new Set(allMonths);
+
+  populateYears();
+  cascadeFromYear();  // populates all lower dropdowns based on current year selection
+}
+
+function populateYears() {
+  const years = [...new Set(allDates.map(d => d.slice(0,4)))].sort();
+  setSelectOptions('f-year', years.map(y => ({ value: y, label: y })));
+}
+
+function datesInScope(afterFilters = {}) {
+  // Return dates matching the currently selected hierarchy above the given level
+  let dates = allDates;
+  const yr = document.getElementById('f-year').value;
+  const qr = document.getElementById('f-quarter').value;
+  const mo = document.getElementById('f-month').value;
+  const wk = document.getElementById('f-week').value;
+  const dt = document.getElementById('f-date').value;
+
+  if (afterFilters.stopBefore === 'year')   return dates;
+  if (yr) dates = dates.filter(d => d.slice(0,4) === yr);
+
+  if (afterFilters.stopBefore === 'quarter') return dates;
+  if (qr) dates = dates.filter(d => {
+    const m = parseInt(d.slice(5,7));
+    const q = Math.ceil(m/3);
+    return String(q) === qr;
+  });
+
+  if (afterFilters.stopBefore === 'month')   return dates;
+  if (mo) dates = dates.filter(d => d.slice(0,7) === mo);
+
+  if (afterFilters.stopBefore === 'week')    return dates;
+  if (wk) dates = dates.filter(d => weekKey(d) === wk);
+
+  if (afterFilters.stopBefore === 'date')    return dates;
+  if (dt) dates = dates.filter(d => d === dt);
+
+  return dates;
+}
+
+// ── CASCADE FUNCTIONS ──
+function cascadeFromYear() {
+  const dates = datesInScope({ stopBefore: 'quarter' });
+  // Quarters available
+  const quarters = [...new Set(dates.map(d => Math.ceil(parseInt(d.slice(5,7))/3)))].sort();
+  setSelectOptions('f-quarter', quarters.map(q => ({ value: String(q), label: `Q${q}` })));
+  cascadeFromQuarter();
+}
+
+function cascadeFromQuarter() {
+  const dates = datesInScope({ stopBefore: 'month' });
+  // Months available
+  const monthSet = [...new Set(dates.map(d => d.slice(0,7)))].sort();
+  const MNAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  setSelectOptions('f-month', monthSet.map(ym => {
+    const [y,m] = ym.split('-');
+    return { value: ym, label: `${MNAMES[parseInt(m)-1]} ${y.slice(2)}` };
+  }));
+  cascadeFromMonth();
+}
+
+function cascadeFromMonth() {
+  const dates = datesInScope({ stopBefore: 'week' });
+  // Group dates by week key — store the FIRST working date in each week
+  const weekMap = {};
+  dates.forEach(d => {
+    const k = weekKey(d);
+    if (!weekMap[k]) weekMap[k] = d;  // first working date in this week
+  });
+  const weeks = Object.keys(weekMap).sort();
+  setSelectOptions('f-week', weeks.map(k => ({ value: k, label: weekLabel(weekMap[k]) })));
+  cascadeFromWeek();
+}
+
+function cascadeFromWeek() {
+  const dates = datesInScope({ stopBefore: 'date' });
+  const DNAMES = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  setSelectOptions('f-date', dates.map(d => {
+    const dow = DNAMES[new Date(d).getDay()];
+    return { value: d, label: `${d.slice(5)} (${dow})` };
+  }));
+  applyFilters();
+}
+
+// ── CHANGE HANDLERS ──
+function onYearChange()    { cascadeFromYear();    }
+function onQuarterChange() { cascadeFromQuarter(); }
+function onMonthChange()   { cascadeFromMonth();   }
+function onWeekChange()    { cascadeFromWeek();    }
+function onDateChange()    { applyFilters();       }
+function onDayChange()     { applyFilters();       }
+
+function setView(v) {
+  currentView = v;
+  document.getElementById('view-daily').classList.toggle('active',   v === 'daily');
+  document.getElementById('view-monthly').classList.toggle('active', v === 'monthly');
+  renderAll();
+}
+
+function resetFilters() {
+  // Reset all dropdowns to "All" first
+  ['f-year','f-quarter','f-month','f-week','f-date','f-day'].forEach(id => {
+    document.getElementById(id).value = '';
+  });
+  currentView = 'monthly';
+  document.getElementById('view-daily').classList.remove('active');
+  document.getElementById('view-monthly').classList.add('active');
+  // initFilters rebuilds dropdowns and triggers cascade → applyFilters → renderAll
+  initFilters();
+}
+
+// ═══════════════════════════════
+// FILTER LOGIC
+// ═══════════════════════════════
+function applyFilters() {
+  // Compute from/to from the cascade selections
+  const activeDates = datesInScope();  // all dates matching current hierarchy
+
+  // Day-of-week filter
+  const dayVal = document.getElementById('f-day').value;
+  const filtDates = new Set(
+    dayVal
+      ? activeDates.filter(d => String(new Date(d).getDay()) === dayVal)
+      : activeDates
+  );
+
+  const from = filtDates.size > 0 ? [...filtDates].sort()[0]  : null;
+  const to   = filtDates.size > 0 ? [...filtDates].sort().at(-1) : null;
+
+  // Update activeMonths for backward-compat (quality sheets use it)
+  const MNAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  function dateToMonth(dateStr) {
+    if (!dateStr) return null;
+    const d = new Date(dateStr);
+    return `${MNAMES[d.getMonth()]} ${String(d.getFullYear()).slice(2)}`;
+  }
+  activeMonths = new Set([...filtDates].map(dateToMonth).filter(Boolean));
+
+  filteredData = {};
+  for (const sheet of Object.keys(rawData)) {
+    filteredData[sheet] = rawData[sheet].filter(r => {
+      if (!r['Date']) return false;
+      return filtDates.has(r['Date']);
+    });
+  }
+  renderAll();
+}
+
+
+// ═══════════════════════════════
+// MONTHLY AGGREGATION
+// ═══════════════════════════════
+function aggregateMonthly(rows, numericCols) {
+  const byMonth = {};
+  rows.forEach(r => {
+    const m = r['Month'] || 'Unknown';
+    if (!byMonth[m]) byMonth[m] = {Month: m, _count: 0};
+    numericCols.forEach(c => {
+      byMonth[m][c] = (byMonth[m][c] || 0) + (r[c] || 0);
+      byMonth[m]['_count']++;
+    });
+  });
+  return Object.values(byMonth);
+}
+
+// ═══════════════════════════════
+// RENDER ALL
+// ═══════════════════════════════
+function renderAll() {
+  renderKPIs();
+  renderInflowChart();
+  renderOutflowChart();
+  renderBacklogChart();
+  renderAbsentTrendChart();
+  renderHeatmap();
+  renderInlineQualityCharts();
+  renderExtQualityCharts();
+  renderQualityTrend();
+  renderExtQualityTrend();
+}
+
+// ═══════════════════════════════
+// KPIs
+// ═══════════════════════════════
+function renderKPIs() {
+  const io = filteredData['Incoming-Outgoing'] || [];
+  const ab = filteredData['Absenteeism'] || [];
+  const ph = filteredData['Present HC'] || [];
+  const th = filteredData['Total HC'] || [];
+  const iq = filteredData['Inline Quality'] || [];
+
+  const workDays = io.filter(isWorkDay);
+
+  // KPI 1: Avg Incoming
+  const totalIn = workDays.reduce((s,r) => s + (r['Incoming Cases(Actuals)']||0), 0);
+  const avgIn = workDays.length ? totalIn / workDays.length : null;
+  document.getElementById('kpi-incoming').textContent = fmt(avgIn);
+
+  // KPI 2: Avg Processed Volume
+  const totalOut = workDays.reduce((s,r) => s + (r['Outgoing(Actuals)- Target 110']||0), 0);
+  const avgOut = workDays.length ? totalOut / workDays.length : null;
+  const achievePct = TARGET > 0 ? ((avgOut||0)/TARGET*100) : 0;
+  document.getElementById('kpi-outgoing').textContent = fmt(avgOut);
+  document.getElementById('kpi-outgoing-trend').innerHTML = `<span class="kpi-trend ${achievePct>=100?'up':'down'}">${fmtPct(achievePct)} of target (110/day)</span>`;
+
+  // KPI 3: Avg Inventory
+  const backlogRows = workDays.filter(r=>r['Backlog(Actuals)']>0);
+  const avgBacklog = backlogRows.length ? backlogRows.reduce((s,r)=>s+(r['Backlog(Actuals)']||0),0)/backlogRows.length : null;
+  const latestBacklog = backlogRows.length ? backlogRows[backlogRows.length-1]['Backlog(Actuals)'] : null;
+  document.getElementById('kpi-backlog').textContent = fmt(avgBacklog);
+  document.getElementById('kpi-backlog-trend').innerHTML = latestBacklog ? `<span class="kpi-trend ${latestBacklog>BACKLOG_THRESHOLD?'down':'neutral'}">Latest: ${fmt(latestBacklog)}</span>` : `Period average`;
+
+  // KPI 4: Attendance
+  const phDays = ph.filter(r => r['Total'] > 0);
+  const thDays = th.filter(r => (r['Total ']||r['Total']) > 0);
+  let attPct = null;
+  if (phDays.length && thDays.length) {
+    const map = {};
+    thDays.forEach(r => map[r['Date']] = r['Total ']||r['Total']||0);
+    let sumP=0, sumT=0;
+    phDays.forEach(r => { sumP += r['Total']||0; sumT += map[r['Date']]||51; });
+    attPct = sumT>0 ? sumP/sumT*100 : null;
+  }
+  document.getElementById('kpi-attendance').textContent = attPct!=null ? fmtPct(attPct) : '—';
+  document.getElementById('kpi-attendance-sub').innerHTML = attPct!=null ? `<span class="kpi-trend ${attPct>=90?'up':'down'}">${attPct>=90?'✓ Above':'⚠ Below'} 90% threshold</span>` : 'Present HC / Total HC';
+
+  // KPI 5: Inline Error Rate % = Overall Errors / Samples
+  const iqErrors = iq.reduce((s,r)=>s+(r['Overall Errors']||0),0);
+  const iqSamples = iq.reduce((s,r)=>s+(r['Samples']||0),0);
+  const iqErrRate = iqSamples>0 ? (iqErrors/iqSamples)*100 : null;
+  document.getElementById('kpi-absent').textContent = iqErrRate!=null ? fmtPct(iqErrRate) : '—';
+  const iqCard = document.getElementById('kpi-absent-card');
+  iqCard.className = 'kpi-card' + (iqErrRate!=null && iqErrRate > 10 ? ' alert' : '');
+  document.getElementById('kpi-absent-sub').textContent = iqSamples>0 ? `${fmt(iqErrors)} errors / ${fmt(iqSamples)} samples` : '—';
+
+  // KPI 6: External Error Rate % = Total Error / Samples
+  const eq = filteredData['External Quality'] || [];
+  const eqErrors = eq.reduce((s,r)=>s+(r['Total Error']||0),0);
+  const eqSamples = eq.reduce((s,r)=>s+(r['Samples']||0),0);
+  const eqErrRate = eqSamples>0 ? (eqErrors/eqSamples)*100 : null;
+  document.getElementById('kpi-quality').textContent = eqErrRate!=null ? fmtPct(eqErrRate) : '—';
+  document.getElementById('kpi-quality-sub').textContent = eqSamples>0 ? `${fmt(eqErrors)} errors / ${fmt(eqSamples)} samples` : '—';
+}
+
+// ═══════════════════════════════
+// SHARED HELPER: build daily or monthly rows
+// Monthly = average per working day in month (not sum)
+// ═══════════════════════════════
+function buildFlowRows(io) {
+  const workDays = io.filter(isWorkDay);
+  if (currentView !== 'monthly') return workDays;
+
+  // Always key by YYYY-MM (from Date field) so chronological sort is correct
+  const byMonth = {};
+  workDays.forEach(r => {
+    const ym = r['Date'].slice(0, 7);           // "2026-01", "2026-02" …
+    if (!byMonth[ym]) byMonth[ym] = { _ym: ym, Month: r['Month'] || ym, _rows: [] };
+    byMonth[ym]._rows.push(r);
+  });
+  const result = Object.entries(byMonth)
+    .sort((a, b) => a[0] < b[0] ? -1 : 1)
+    .map(([ym, obj]) => {
+      const rows = obj._rows;
+      const n    = rows.length;
+      const label = obj.Month && obj.Month !== ym
+        ? obj.Month
+        : monthLabel(ym);
+      return {
+        Date: label, Month: label,
+        'Incoming Cases(Actuals)':       rows.reduce((s,r)=>s+(r['Incoming Cases(Actuals)']||0),0) / n,
+        'Outgoing(Actuals)- Target 110': rows.reduce((s,r)=>s+(r['Outgoing(Actuals)- Target 110']||0),0) / n,
+        'Backlog(Actuals)':              rows.reduce((s,r)=>s+(r['Backlog(Actuals)']||0),0) / n,
+      };
+    });
+  // Deduplicate by label as safety guard
+  const seenLabels = new Set();
+  return result.filter(r => {
+    if (seenLabels.has(r.Month)) return false;
+    seenLabels.add(r.Month); return true;
+  });
+}
+
+// ═══════════════════════════════
+// CHART 1a: INFLOW VOLUME
+// ═══════════════════════════════
+function renderInflowChart() {
+  destroyChart('chart-inflow');
+  const io = filteredData['Incoming-Outgoing'] || [];
+  const rows = buildFlowRows(io);
+  const labels   = rows.map(r => r['Date'] || r['Month']);
+  const incoming = rows.map(r => r['Incoming Cases(Actuals)'] || 0);
+
+  const avgIn = incoming.length ? incoming.reduce((a,b)=>a+b,0)/incoming.length : 0;
+
+  const badge = document.getElementById('badge-inflow');
+  badge.textContent = 'Avg: ' + Math.round(avgIn) + '/day';
+  badge.className = 'chart-badge badge-green';
+
+  const subtitle = document.getElementById('inflow-subtitle');
+  subtitle.textContent = currentView === 'monthly'
+    ? 'Avg daily inflow per month'
+    : 'Daily incoming cases';
+
+  const ctx = document.getElementById('chart-inflow').getContext('2d');
+  chartInstances['chart-inflow'] = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Inflow',
+        data: incoming.map(v => parseFloat(v.toFixed(1))),
+        backgroundColor: 'rgba(29,111,242,0.65)',
+        borderRadius: 4,
+        datalabels: {
+          display: true,
+          anchor: 'end', align: 'end',
+          formatter: v => v > 0 ? Math.round(v) : '',
+          font: { size: 10, weight: '700' },
+          color: '#1d6ff2',
+          clip: false
+        }
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      layout: { padding: { top: 20 } },
+      plugins: {
+        datalabels: { display: true },
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label(ctx) {
+              const v = ctx.parsed.y;
+              return (currentView === 'monthly' ? 'Avg daily inflow: ' : 'Inflow: ') + Math.round(v);
+            },
+            afterBody(ctx2) {
+              if (currentView !== 'daily') return [];
+              const row = io.filter(isWorkDay)[ctx2[0].dataIndex];
+              return row && row['Insights'] ? ['📌 ' + row['Insights'].replace(/\n/g,' | ')] : [];
+            }
+          }
+        }
+      },
+      scales: {
+        x: { ticks: { font: { size: 10 }, maxRotation: 45 } },
+        y: { beginAtZero: true, ticks: { font: { size: 10 } } }
+      }
+    }
+  });
+}
+
+// ═══════════════════════════════
+// CHART 1b: PROCESSED VOLUME vs TARGET
+// ═══════════════════════════════
+function renderOutflowChart() {
+  destroyChart('chart-outflow');
+  const io = filteredData['Incoming-Outgoing'] || [];
+  const rows    = buildFlowRows(io);
+  const labels  = rows.map(r => r['Date'] || r['Month']);
+  const outgoing = rows.map(r => r['Outgoing(Actuals)- Target 110'] || 0);
+
+  const barColors = outgoing.map(v => v >= TARGET ? 'rgba(13,148,136,0.72)' : 'rgba(220,38,38,0.72)');
+  const metTarget = outgoing.filter(v => v >= TARGET).length;
+  const pct = outgoing.length ? (metTarget / outgoing.length * 100).toFixed(0) : 0;
+
+  const badge = document.getElementById('badge-target');
+  badge.textContent = pct + '% ' + (currentView === 'monthly' ? 'months' : 'days') + ' met target';
+  badge.className = 'chart-badge ' + (pct >= 80 ? 'badge-green' : pct >= 60 ? 'badge-amber' : 'badge-red');
+
+  const subtitle = document.getElementById('outflow-subtitle');
+  subtitle.textContent = currentView === 'monthly'
+    ? 'Avg daily processed cases per month · target 110'
+    : 'Daily processed cases · target 110';
+
+  const ctx = document.getElementById('chart-outflow').getContext('2d');
+  chartInstances['chart-outflow'] = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: 'Processed Volume',
+          data: outgoing.map(v => parseFloat(v.toFixed(1))),
+          backgroundColor: barColors,
+          borderRadius: 4,
+          order: 2,
+          datalabels: {
+            display: true,
+            anchor: 'end', align: 'end',
+            formatter: v => v > 0 ? Math.round(v) : '',
+            font: { size: 10, weight: '700' },
+            color: '#111827',
+            clip: false
+          }
+        },
+        {
+          label: 'Target (110)',
+          data: rows.map(() => TARGET),
+          type: 'line',
+          borderColor: '#d97706',
+          borderDash: [5, 4],
+          borderWidth: 2,
+          pointRadius: 0,
+          order: 1,
+          datalabels: { display: false }
+        }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      layout: { padding: { top: 20 } },
+      plugins: {
+        datalabels: { display: true },
+        legend: { position: 'top', labels: { font: { size: 10 } } },
+        tooltip: {
+          callbacks: {
+            label(ctx) {
+              if (ctx.dataset.label === 'Target (110)') return 'Target: 110/day';
+              const v = ctx.parsed.y;
+              return (currentView === 'monthly' ? 'Avg daily processed: ' : 'Processed: ') + Math.round(v)
+                + (v >= TARGET ? ' ✓' : ' ✗');
+            },
+            afterBody(ctx2) {
+              if (currentView !== 'daily') return [];
+              const row = io.filter(isWorkDay)[ctx2[0].dataIndex];
+              return row && row['Insights'] ? ['📌 ' + row['Insights'].replace(/\n/g,' | ')] : [];
+            }
+          }
+        }
+      },
+      scales: {
+        x: { ticks: { font: { size: 10 }, maxRotation: 45 } },
+        y: { beginAtZero: true, ticks: { font: { size: 10 } } }
+      }
+    }
+  });
+}
+
+
+// ═══════════════════════════════
+// CHART 2: INVENTORY TREND
+// ═══════════════════════════════
+function renderBacklogChart() {
+  destroyChart('chart-backlog');
+  const io = filteredData['Incoming-Outgoing'] || [];
+
+  let labels, values, subtitleText;
+
+  if (currentView === 'monthly') {
+    // Monthly: average daily inventory per month (exclude zero-backlog days)
+    const byMonth = {};
+    io.filter(r => isWorkDay(r) && r['Backlog(Actuals)'] > 0).forEach(r => {
+      const ym    = r['Date'].slice(0, 7);
+      const label = r['Month'] || monthLabel(ym);
+      if (!byMonth[ym]) byMonth[ym] = { sum: 0, count: 0, label };
+      byMonth[ym].sum   += r['Backlog(Actuals)'] || 0;
+      byMonth[ym].count += 1;
+    });
+    const sorted = Object.entries(byMonth).sort((a, b) => a[0] < b[0] ? -1 : 1);
+    labels       = sorted.map(([, d]) => d.label);
+    values       = sorted.map(([, d]) => d.count > 0 ? d.sum / d.count : 0);
+    subtitleText = 'Avg daily inventory per month';
+  } else {
+    // Daily view
+    const rows = io.filter(r => r['Backlog(Actuals)'] > 0 && isWorkDay(r));
+    labels       = rows.map(r => r['Date']);
+    values       = rows.map(r => r['Backlog(Actuals)']);
+    subtitleText = 'Cumulative inventory by day';
+  }
+
+  const maxB = Math.max(...values, 0);
+  const badge = document.getElementById('badge-backlog');
+  badge.textContent = `Peak: ${fmt(maxB)}`;
+  badge.className = 'chart-badge badge-red';
+
+  // Update subtitle dynamically
+  const subtitleEl = document.querySelector('#chart-backlog')?.closest('.chart-card')?.querySelector('.chart-subtitle');
+  if (subtitleEl) subtitleEl.textContent = subtitleText;
+
+  const ctx = document.getElementById('chart-backlog').getContext('2d');
+
+  if (currentView === 'monthly') {
+    // Bar chart for monthly view
+    const barColors = values.map(v => v > BACKLOG_THRESHOLD ? 'rgba(220,38,38,0.72)' : 'rgba(29,111,242,0.65)');
+    chartInstances['chart-backlog'] = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [
+          { label: 'Avg Inventory', data: values.map(v => Math.round(v)), backgroundColor: barColors, borderRadius: 4,
+            datalabels: { display: true, anchor: 'end', align: 'end', formatter: v => fmt(v), font: { size: 11, weight: '700' }, color: '#111827', clip: false } }
+        ]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        layout: { padding: { top: 24 } },
+        plugins: {
+          datalabels: { display: true },
+          legend: { position: 'top', labels: { font: { size: 10 } } },
+          tooltip: { callbacks: { label(ctx) { return ctx.dataset.label + ': ' + fmt(ctx.parsed.y); } } }
+        },
+        scales: {
+          x: { ticks: { font: { size: 11 } }, grid: { display: false } },
+          y: { beginAtZero: false, ticks: { font: { size: 10 } } }
+        }
+      }
+    });
+  } else {
+    // Line chart for daily view
+    chartInstances['chart-backlog'] = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [
+          { label: 'Inventory', data: values, fill: true, backgroundColor: 'rgba(220,38,38,0.08)', borderColor: '#dc2626', borderWidth: 2, pointRadius: 3, tension: 0.3,
+            datalabels: { display: ctx => ctx.dataIndex % Math.max(1, Math.floor(values.length / 10)) === 0, anchor: 'top', align: 'top', formatter: v => Math.round(v), font: { size: 9, weight: '600' }, color: '#dc2626' } }
+        ]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+          datalabels: { display: true },
+          legend: { position: 'top', labels: { font: { size: 10 } } },
+          tooltip: { callbacks: { afterBody(ctx) {
+            const row = io.filter(r => r['Backlog(Actuals)'] > 0 && isWorkDay(r))[ctx[0].dataIndex];
+            return row && row['Insights'] ? ['📌 ' + row['Insights'].replace(/\n/g, ' | ')] : [];
+          }}}
+        },
+        scales: { x: { ticks: { font: { size: 9 }, maxRotation: 45 } }, y: { beginAtZero: false, ticks: { font: { size: 10 } } } }
+      }
+    });
+  }
+}
+
+
+// ═══════════════════════════════
+// CHART 3: ATTENDANCE
+// ═══════════════════════════════
+// ═══════════════════════════════
+// CHART 5: OVERALL ABSENTEEISM %
+// Formula: Absenteeism % = (Total Absent / Total HC) × 100
+// Daily view  → avg % by day of week (Mon–Fri)
+// Monthly view → avg % by month
+// ═══════════════════════════════
+function renderAbsentTrendChart() {
+  destroyChart('chart-absent-trend');
+  const ab = filteredData['Absenteeism'] || [];
+  const th = filteredData['Total HC']    || [];
+
+  // Build a date → Total HC lookup
+  const hcByDate = {};
+  th.forEach(r => {
+    const totalHC = r['Total '] || r['Total'] || 0;
+    if (r['Date'] && totalHC > 0) hcByDate[r['Date']] = totalHC;
+  });
+
+  // Join absent + HC for ALL working days (including days with zero absences)
+  // Correct formula: sum(Absent) / sum(Total HC) × 100
+  const daily = ab
+    .filter(r => hcByDate[r['Date']])          // only real working days (HC > 0)
+    .map(r => ({
+      date:  r['Date'],
+      month: r['Month'] || monthLabel(r['Date'].slice(0, 7)),
+      ym:    r['Date'].slice(0, 7),
+      dow:   new Date(r['Date']).getDay(),      // 0=Sun,1=Mon…6=Sat
+      abs:   r['Total'] || 0,                  // absent count (can be 0)
+      hc:    hcByDate[r['Date']]               // total HC for that day
+    }))
+    .filter(r => r.dow >= 1 && r.dow <= 5);   // Mon–Fri only
+
+  const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
+  let labels, values, subtitleText;
+
+  if (currentView === 'monthly') {
+    // ── MONTHLY: sum(Absent) / sum(HC) × 100 per month ──
+    const byMonth = {};
+    daily.forEach(r => {
+      if (!byMonth[r.ym]) byMonth[r.ym] = { sumAbs: 0, sumHC: 0, label: r.month };
+      byMonth[r.ym].sumAbs += r.abs;
+      byMonth[r.ym].sumHC  += r.hc;
+    });
+    const sorted = Object.entries(byMonth).sort((a, b) => a[0] < b[0] ? -1 : 1);
+    // Deduplicate by label as safety guard
+    const seenLabels = new Set();
+    const dedupedSorted = sorted.filter(([, d]) => {
+      if (seenLabels.has(d.label)) return false;
+      seenLabels.add(d.label); return true;
+    });
+    labels      = dedupedSorted.map(([, d]) => d.label);
+    values      = dedupedSorted.map(([, d]) => d.sumHC > 0 ? (d.sumAbs / d.sumHC) * 100 : 0);
+    subtitleText = 'Absenteeism % per month  (Total Absent ÷ Total HC × 100)';
+
+  } else {
+    // ── DAY OF WEEK: sum(Absent) / sum(HC) × 100 per DOW ──
+    const byDow = {};
+    [1,2,3,4,5].forEach(d => byDow[d] = { sumAbs: 0, sumHC: 0 });
+    daily.forEach(r => {
+      byDow[r.dow].sumAbs += r.abs;
+      byDow[r.dow].sumHC  += r.hc;
+    });
+    labels      = DAY_NAMES;
+    values      = [1,2,3,4,5].map(d => byDow[d].sumHC > 0 ? (byDow[d].sumAbs / byDow[d].sumHC) * 100 : 0);
+    subtitleText = 'Absenteeism % by day of week  (Total Absent ÷ Total HC × 100)';
+  }
+
+  // Badge: overall avg %
+  const overall = values.length > 0 ? values.reduce((a, b) => a + b, 0) / values.length : 0;
+  document.getElementById('absent-trend-subtitle').textContent = subtitleText;
+  const badge = document.getElementById('badge-absent-trend');
+  badge.textContent = 'Avg: ' + overall.toFixed(1) + '%';
+  badge.className   = 'chart-badge ' + (overall > 15 ? 'badge-red' : overall > 8 ? 'badge-amber' : 'badge-green');
+
+  // Bar colours: red if > 10%, amber if 5–10%, teal if ≤ 5%
+  const barColors = values.map(v =>
+    v > 10 ? 'rgba(220,38,38,0.72)' :
+    v > 5  ? 'rgba(217,119,6,0.72)' :
+             'rgba(13,148,136,0.72)'
+  );
+
+  const ctx = document.getElementById('chart-absent-trend').getContext('2d');
+  chartInstances['chart-absent-trend'] = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Absenteeism %',
+        data: values.map(v => parseFloat(v.toFixed(2))),
+        backgroundColor: barColors,
+        borderRadius: 4,
+        datalabels: {
+          display: true,
+          anchor: 'end', align: 'end',
+          formatter: v => v > 0 ? v.toFixed(1) + '%' : '',
+          font: { size: 11, weight: '700' },
+          color: '#111827',
+          clip: false
+        }
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      layout: { padding: { top: 20 } },
+      plugins: {
+        datalabels: { display: true },
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label(ctx) {
+              return 'Absenteeism: ' + ctx.parsed.y.toFixed(2) + '%';
+            }
+          }
+        }
+      },
+      scales: {
+        x: { ticks: { font: { size: 11 } }, grid: { display: false } },
+        y: {
+          beginAtZero: true,
+          ticks: { font: { size: 10 }, callback: v => v + '%' }
+        }
+      }
+    }
+  });
+}
+
+// ═══════════════════════════════
+// CHART 4: ABSENTEEISM SUMMARY TABLE
+// Rows: CP Absent | MR Absent | Total Absent | Absenteeism %
+// CP = DE + DE/QC + Intake + QC
+// Absenteeism % = Total Absent / Total HC × 100
+// Columns: dates (daily) or months (monthly view)
+// ═══════════════════════════════
+function renderHeatmap() {
+  const ab = filteredData['Absenteeism'] || [];
+  const th = filteredData['Total HC']    || [];
+
+  // Total HC by date
+  const hcByDate = {};
+  th.forEach(r => {
+    const hc = r['Total '] || r['Total'] || 0;
+    if (r['Date'] && hc > 0) hcByDate[r['Date']] = hc;
+  });
+
+  // CP teams
+  const CP_TEAMS = ['DE', 'DE / QC', 'Intake', 'QC'];
+
+  // Work out columns depending on view
+  let cols; // array of { key, label }
+
+  if (currentView === 'monthly') {
+    document.getElementById('heatmap-title').textContent = 'Absenteeism Summary by Month';
+    // Group by month
+    const byMonth = {};
+    ab.forEach(r => {
+      if (!r['Date']) return;
+      const ym    = r['Date'].slice(0, 7);
+      const label = r['Month'] || monthLabel(ym);
+      if (!byMonth[ym]) byMonth[ym] = { label, ym, cpSum:0, mrSum:0, totSum:0, hcSum:0, days:0 };
+      const cp  = CP_TEAMS.reduce((s, t) => s + (r[t] || 0), 0);
+      const mr  = r['MR'] || 0;
+      const tot = r['Total'] || 0;
+      const hc  = hcByDate[r['Date']] || 0;
+      if (tot > 0 || hc > 0) {
+        byMonth[ym].cpSum  += cp;
+        byMonth[ym].mrSum  += mr;
+        byMonth[ym].totSum += tot;
+        byMonth[ym].hcSum  += hc;
+        byMonth[ym].days   += 1;
+      }
+    });
+    cols = Object.entries(byMonth)
+      .sort((a, b) => a[0] < b[0] ? -1 : 1)
+      .map(([ym, d]) => ({
+        key: ym,
+        label: d.label,
+        cp:  d.days > 0 ? d.cpSum  / d.days : 0,
+        mr:  d.days > 0 ? d.mrSum  / d.days : 0,
+        tot: d.days > 0 ? d.totSum / d.days : 0,
+        pct: d.hcSum  > 0 ? (d.totSum / d.hcSum) * 100 : null,
+        isAvg: true
+      }));
+  } else {
+    document.getElementById('heatmap-title').textContent = 'Absenteeism Summary by Date';
+    // Daily — all working days with data
+    const dates = [...new Set(ab.filter(r=>r['Date']).map(r=>r['Date']))].sort();
+    cols = dates.map(d => {
+      const row = ab.find(r => r['Date'] === d);
+      const cp  = row ? CP_TEAMS.reduce((s, t) => s + (row[t] || 0), 0) : 0;
+      const mr  = row ? (row['MR'] || 0) : 0;
+      const tot = row ? (row['Total'] || 0) : 0;
+      const hc  = hcByDate[d] || 0;
+      return {
+        key:   d,
+        label: d.slice(5),    // MM-DD
+        cp, mr, tot,
+        pct:   hc > 0 ? (tot / hc) * 100 : null,
+        isAvg: false
+      };
+    }).filter(c => c.tot > 0 || c.cp > 0 || c.mr > 0);
+  }
+
+  if (!cols.length) {
+    document.getElementById('heatmap-wrap').innerHTML =
+      '<p style="color:var(--text-muted);padding:16px">No absenteeism data for the selected period.</p>';
+    return;
+  }
+
+  // Max values for shading
+  const maxCP  = Math.max(...cols.map(c => c.cp),  1);
+  const maxMR  = Math.max(...cols.map(c => c.mr),  1);
+  const maxTot = Math.max(...cols.map(c => c.tot), 1);
+
+  function numCell(v, max, isAvg) {
+    const disp = isAvg ? (v > 0 ? v.toFixed(1) : '—') : (v > 0 ? v : '—');
+    if (!v || v === 0) return `<td class="abs-cell-0">${disp}</td>`;
+    const ratio = v / max;
+    const cls   = ratio >= 0.7 ? 'abs-cell-hi' : ratio >= 0.35 ? 'abs-cell-mid' : 'abs-cell-low';
+    return `<td class="${cls}">${disp}</td>`;
+  }
+
+  function pctCell(pct) {
+    if (pct == null) return '<td class="abs-cell-0">—</td>';
+    const disp = pct.toFixed(1) + '%';
+    const cls  = pct >= 10 ? 'abs-pct-bad' : 'abs-pct-ok';
+    return `<td class="${cls}">${disp}</td>`;
+  }
+
+  // Build table
+  const colLabel = currentView === 'monthly' ? 'Month' : 'Date';
+  let html = `<table class="abs-table">
+    <tr>
+      <th class="row-hdr">Metric</th>
+      ${cols.map(c => `<th title="${c.key}">${c.label}</th>`).join('')}
+    </tr>
+    <tr>
+      <td class="row-label">CP Absent${currentView==='monthly'?' (avg/day)':''}</td>
+      ${cols.map(c => numCell(c.cp, maxCP, c.isAvg)).join('')}
+    </tr>
+    <tr>
+      <td class="row-label">MR Absent${currentView==='monthly'?' (avg/day)':''}</td>
+      ${cols.map(c => numCell(c.mr, maxMR, c.isAvg)).join('')}
+    </tr>
+    <tr>
+      <td class="row-label">Total Absent${currentView==='monthly'?' (avg/day)':''}</td>
+      ${cols.map(c => numCell(c.tot, maxTot, c.isAvg)).join('')}
+    </tr>
+    <tr class="row-pct">
+      <td class="row-label">Absenteeism %</td>
+      ${cols.map(c => pctCell(c.pct)).join('')}
+    </tr>
+  </table>`;
+
+  document.getElementById('heatmap-wrap').innerHTML = html;
+}
+
+// ═══════════════════════════════
+// QUALITY HELPERS
+// Helper: derive "Mon YY" month label from YYYY-MM date key
+// ═══════════════════════════════
+function monthLabel(ym) {
+  const [y, m] = ym.split('-');
+  return ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][parseInt(m)-1] + ' ' + y.slice(2);
+}
+
+// Group quality data by YYYY-MM, return sorted array of {month, samp, numeratorField}
+function groupQualityByMonth(rows, sampField, ...numFields) {
+  const byMonth = {};
+  rows.forEach(r => {
+    const ym = r['Date'].slice(0, 7);
+    if (!byMonth[ym]) {
+      byMonth[ym] = { samp: 0 };
+      numFields.forEach(f => byMonth[ym][f] = 0);
+    }
+    byMonth[ym].samp += (r[sampField] || 0);
+    numFields.forEach(f => byMonth[ym][f] += (r[f] || 0));
+  });
+  return Object.entries(byMonth).sort((a,b)=>a[0]>b[0]?1:-1);
+}
+
+// Build a grouped-by-month quality chart
+// monthlyValues: array of {label, value} — value is quality %, null if no data
+// target: the ≥ threshold
+// ROUNDING RULE: value >= (target - 0.5) is considered MET (e.g. 98.5% meets 99% target)
+function makeQualityChart(canvasId, badgeId, monthlyValues, target) {
+  destroyChart(canvasId);
+
+  // Deduplicate by label — keep last occurrence per label (safety guard)
+  const seen = {};
+  monthlyValues.forEach(d => { seen[d.label] = d; });
+  monthlyValues = Object.values(seen);
+
+  const ROUND_THRESHOLD = target - 0.5;   // e.g. 98.5 for a 99% target
+
+  const labels = monthlyValues.map(d => d.label);
+  const values = monthlyValues.map(d => d.value);
+
+  const barColors = values.map(v =>
+    v == null ? '#e5e7eb' : v >= ROUND_THRESHOLD ? 'rgba(13,148,136,0.82)' : 'rgba(220,38,38,0.82)'
+  );
+
+  // Badge: overall across all months shown
+  const validVals = values.filter(v => v != null);
+  const anyBelow = validVals.some(v => v < ROUND_THRESHOLD);
+  const badge = document.getElementById(badgeId);
+  if (validVals.length > 0) {
+    badge.textContent = anyBelow ? '✗ Below Target' : '✓ All Met';
+    badge.className = 'chart-badge ' + (anyBelow ? 'badge-red' : 'badge-green');
+  } else {
+    badge.textContent = '—'; badge.className = 'chart-badge';
+  }
+
+  const ctx = document.getElementById(canvasId).getContext('2d');
+  chartInstances[canvasId] = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: 'Quality %',
+          data: values.map(v => v != null ? parseFloat(v.toFixed(2)) : null),
+          backgroundColor: barColors,
+          borderRadius: 6,
+          barThickness: 48,
+          datalabels: {
+            display: true,
+            anchor: 'end',
+            align: 'end',
+            offset: 4,
+            formatter: v => v != null ? Math.round(v) + '%' : '',
+            color: '#111827',
+            font: { size: 12, weight: '700' },
+            clamp: true,
+            clip: false
+          }
+        },
+        {
+          label: 'Target (' + target + '%)',
+          data: labels.map(() => target),
+          type: 'line',
+          borderColor: '#d97706',
+          borderDash: [6, 4],
+          borderWidth: 2,
+          pointStyle: false,
+          fill: false,
+          datalabels: { display: false }
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      layout: { padding: { top: 24 } },
+      plugins: {
+        datalabels: { display: true },
+        legend: {
+          display: true,
+          position: 'top',
+          labels: { font: { size: 10 }, boxWidth: 24 }
+        },
+        tooltip: {
+          callbacks: {
+            label(ctx) {
+              if (ctx.dataset.label.startsWith('Target')) return 'Target: ' + target + '% (met if ≥' + ROUND_THRESHOLD + '%)';
+              const v = values[ctx.dataIndex];
+              return v != null
+                ? 'Quality: ' + v.toFixed(2) + '% (' + (v >= ROUND_THRESHOLD ? '✓ Meets' : '✗ Below') + ' ' + target + '% target)'
+                : 'No data';
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          ticks: { font: { size: 11 } },
+          grid: { display: false }
+        },
+        y: {
+          min: Math.floor(Math.max(0, Math.min(...validVals, target) - 3)),
+          max: 101,
+          ticks: { font: { size: 10 }, callback: v => v + '%' },
+          grid: { color: '#f3f4f6' }
+        }
+      }
+    }
+  });
+}
+
+// ═══════════════════════════════
+// CHART 6a: INLINE QUALITY — 3 individual monthly charts
+// Formula: Quality % = (1 − DPU/Samples) × 100
+// Targets: Critical ≥96%, Major ≥92%, Minor ≥90%
+// ═══════════════════════════════
+function renderInlineQualityCharts() {
+  const iq = filteredData['Inline Quality'] || [];
+
+  const grouped = groupQualityByMonth(iq, 'Samples', 'Critical DPU', 'Major DPU', 'Minor DPU');
+
+  const critMonthly = grouped.map(([ym, d]) => ({
+    label: monthLabel(ym),
+    value: d.samp > 0 ? (1 - d['Critical DPU'] / d.samp) * 100 : null
+  }));
+  const majMonthly = grouped.map(([ym, d]) => ({
+    label: monthLabel(ym),
+    value: d.samp > 0 ? (1 - d['Major DPU']   / d.samp) * 100 : null
+  }));
+  const minMonthly = grouped.map(([ym, d]) => ({
+    label: monthLabel(ym),
+    value: d.samp > 0 ? (1 - d['Minor DPU']   / d.samp) * 100 : null
+  }));
+
+  const totSamp = iq.reduce((s,r) => s + (r['Samples']||0), 0);
+  document.getElementById('quality-sample-label').textContent =
+    totSamp > 0 ? '· Samples: ' + fmt(totSamp) : '';
+
+  makeQualityChart('chart-iq-crit', 'badge-iq-crit', critMonthly, 96);
+  makeQualityChart('chart-iq-maj',  'badge-iq-maj',  majMonthly,  92);
+  makeQualityChart('chart-iq-min',  'badge-iq-min',  minMonthly,  90);
+}
+
+// ═══════════════════════════════
+// CHART 6b: EXTERNAL QUALITY — 2 individual monthly charts
+// Formula: Quality % = (1 − Unit/Samples) × 100
+// Targets: Critical ≥99%, Major ≥97%
+// ═══════════════════════════════
+function renderExtQualityCharts() {
+  const eq = filteredData['External Quality'] || [];
+
+  const grouped = groupQualityByMonth(eq, 'Samples', 'Critical Unit', 'Major Unit');
+
+  const critMonthly = grouped.map(([ym, d]) => ({
+    label: monthLabel(ym),
+    value: d.samp > 0 ? (1 - d['Critical Unit'] / d.samp) * 100 : null
+  }));
+  const majMonthly = grouped.map(([ym, d]) => ({
+    label: monthLabel(ym),
+    value: d.samp > 0 ? (1 - d['Major Unit']    / d.samp) * 100 : null
+  }));
+
+  const totSamp = eq.reduce((s,r) => s + (r['Samples']||0), 0);
+  document.getElementById('ext-quality-sample-label').textContent =
+    totSamp > 0 ? '· Samples: ' + fmt(totSamp) : '';
+
+  makeQualityChart('chart-eq-crit', 'badge-eq-crit', critMonthly, 99);
+  makeQualityChart('chart-eq-maj',  'badge-eq-maj',  majMonthly,  97);
+}
+
+// ═══════════════════════════════
+// ═══════════════════════════════
+// ═══════════════════════════════
+// CHART 8: CAPACITY
+// ═══════════════════════════════
+// ═══════════════════════════════
+// QUALITY TREND
+// ═══════════════════════════════
+// ═══════════════════════════════
+// ERROR TREND STATE
+// ═══════════════════════════════
+let iqErrFilter = 'Overall';  // active filter for Inline Quality trend
+let eqErrFilter = 'Overall';  // active filter for External Quality trend
+
+function setIQFilter(type) {
+  iqErrFilter = type;
+  ['overall','critical','major','minor'].forEach(k => {
+    const btn = document.getElementById('iq-btn-' + k);
+    if (btn) btn.classList.toggle('active', k === type.toLowerCase());
+  });
+  renderQualityTrend();
+}
+
+function setEQFilter(type) {
+  eqErrFilter = type;
+  ['overall','critical','major'].forEach(k => {
+    const btn = document.getElementById('eq-btn-' + k);
+    if (btn) btn.classList.toggle('active', k === type.toLowerCase());
+  });
+  renderExtQualityTrend();
+}
+
+// ═══════════════════════════════
+// CHART: INLINE QUALITY ERROR TREND
+// ═══════════════════════════════
+function renderQualityTrend() {
+  destroyChart('chart-quality-trend');
+  const iq = filteredData['Inline Quality'] || [];
+
+  // Column mapping for each filter
+  const colMap = {
+    'Overall':  'Overall Errors',
+    'Critical': 'Total Critical Errors',
+    'Major':    'Total Major Errors',
+    'Minor':    'Total Minor Errors'
+  };
+  const col = colMap[iqErrFilter] || 'Overall Errors';
+
+  // Bar colour per type
+  const colorMap = {
+    'Overall':  'rgba(220,38,38,0.65)',
+    'Critical': 'rgba(124,58,237,0.70)',
+    'Major':    'rgba(217,119,6,0.70)',
+    'Minor':    'rgba(29,111,242,0.65)'
+  };
+  const barColor = colorMap[iqErrFilter];
+
+  let labels, values;
+  if (currentView === 'monthly') {
+    const byMonth = {};
+    iq.forEach(r => {
+      const m = r['Date'].slice(0,7);
+      if (!byMonth[m]) byMonth[m] = { sum: 0, label: r['Month'] || monthLabel(m) };
+      byMonth[m].sum += (r[col] || 0);
+    });
+    const sorted = Object.entries(byMonth).sort((a,b) => a[0] < b[0] ? -1 : 1);
+    labels = sorted.map(([,d]) => d.label);
+    values = sorted.map(([,d]) => d.sum);
+  } else {
+    labels = iq.map(r => r['Date']);
+    values = iq.map(r => r[col] || 0);
+  }
+
+  document.getElementById('iq-trend-subtitle').textContent =
+    (currentView === 'monthly' ? 'Monthly' : 'Daily') + ' error count · ' + iqErrFilter + ' errors';
+
+  const ctx = document.getElementById('chart-quality-trend').getContext('2d');
+  chartInstances['chart-quality-trend'] = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: iqErrFilter + ' Errors',
+        data: values,
+        backgroundColor: barColor,
+        borderRadius: 3,
+        datalabels: {
+          display: true,
+          anchor: 'end', align: 'end',
+          formatter: v => v > 0 ? v : '',
+          font: { size: 9, weight: '600' },
+          color: '#111827',
+          clip: false
+        }
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      layout: { padding: { top: 18 } },
+      plugins: {
+        datalabels: { display: true },
+        legend: { display: false }
+      },
+      scales: {
+        x: { ticks: { font: { size: 9 }, maxRotation: 45 } },
+        y: { beginAtZero: true, ticks: { font: { size: 10 } } }
+      }
+    }
+  });
+}
+
+// ═══════════════════════════════
+// CHART: EXTERNAL QUALITY ERROR TREND
+// ═══════════════════════════════
+function renderExtQualityTrend() {
+  destroyChart('chart-ext-quality-trend');
+  const eq = filteredData['External Quality'] || [];
+
+  const colMap = {
+    'Overall':  'Total Error',
+    'Critical': 'Critical Unit',
+    'Major':    'Major Unit'
+  };
+  const col = colMap[eqErrFilter] || 'Total Error';
+
+  const colorMap = {
+    'Overall':  'rgba(220,38,38,0.65)',
+    'Critical': 'rgba(124,58,237,0.70)',
+    'Major':    'rgba(217,119,6,0.70)'
+  };
+  const barColor = colorMap[eqErrFilter];
+
+  let labels, values;
+  if (currentView === 'monthly') {
+    const byMonth = {};
+    eq.forEach(r => {
+      const m = r['Date'].slice(0,7);
+      if (!byMonth[m]) byMonth[m] = { sum: 0, label: monthLabel(m) };
+      byMonth[m].sum += (r[col] || 0);
+    });
+    const sorted = Object.entries(byMonth).sort((a,b) => a[0] < b[0] ? -1 : 1);
+    labels = sorted.map(([,d]) => d.label);
+    values = sorted.map(([,d]) => d.sum);
+  } else {
+    labels = eq.map(r => r['Date']);
+    values = eq.map(r => r[col] || 0);
+  }
+
+  document.getElementById('eq-trend-subtitle').textContent =
+    (currentView === 'monthly' ? 'Monthly' : 'Daily') + ' error count · ' + eqErrFilter + ' errors';
+
+  const ctx = document.getElementById('chart-ext-quality-trend').getContext('2d');
+  chartInstances['chart-ext-quality-trend'] = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: eqErrFilter + ' Errors',
+        data: values,
+        backgroundColor: barColor,
+        borderRadius: 3,
+        datalabels: {
+          display: true,
+          anchor: 'end', align: 'end',
+          formatter: v => v > 0 ? v : '',
+          font: { size: 9, weight: '600' },
+          color: '#111827',
+          clip: false
+        }
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      layout: { padding: { top: 18 } },
+      plugins: {
+        datalabels: { display: true },
+        legend: { display: false }
+      },
+      scales: {
+        x: { ticks: { font: { size: 9 }, maxRotation: 45 } },
+        y: { beginAtZero: true, ticks: { font: { size: 10 } } }
+      }
+    }
+  });
+}
+
+// ═══════════════════════════════
+// INIT
+// ═══════════════════════════════
+document.addEventListener('DOMContentLoaded', () => {
+  initFilters();
+  initSharePoint();  // check localStorage for saved URL and auto-fetch if found
+});
+</script>
+</body>
+</html>
